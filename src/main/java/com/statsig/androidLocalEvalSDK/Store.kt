@@ -1,29 +1,51 @@
 package com.statsig.androidLocalEvalSDK
 
+import android.content.SharedPreferences
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 
+private const val CACHE_BY_SDK_KEY: String = "Statsig.CACHE_BY_KEY"
+
 internal class Store(
+    private val sdkKey: String,
     private var network: StatsigNetwork,
     private var options: StatsigOptions,
     private var statsigMetadata: StatsigMetadata,
     private var statsigScope: CoroutineScope,
+    private val sharedPrefs: SharedPreferences,
     private val errorBoundary: ErrorBoundary,
 ) {
     internal var initReason: EvaluationReason = EvaluationReason.UNINITIALIZED
     internal var lcut: Long = 0
 
     private var gson = StatsigUtils.getGson()
+    private val dispatcherProvider = CoroutineDispatcherProvider()
 
     private var dynamicConfigs: Map<String, APIConfig> = emptyMap()
     private var gates: Map<String, APIConfig> = emptyMap()
     private var layerConfigs: Map<String, APIConfig> = emptyMap()
     private var experimentToLayer: Map<String, String> = emptyMap()
+    private var cacheByKey: MutableMap<String, String> = mutableMapOf()
 
     fun syncLoadFromLocalStorage() {
+        val cachedConfigSpecs = StatsigUtils.syncGetFromSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY)
+        if (cachedConfigSpecs != null) {
+            try {
+                val cacheByKeyType = object : TypeToken<MutableMap<String, String>>() {}.type
+                cacheByKey = gson.fromJson(cachedConfigSpecs, cacheByKeyType)
+                val currentCache = gson.fromJson(cacheByKey[sdkKey], APIDownloadedConfigs::class.java)
+                setConfigSpecs(currentCache)
+            } catch (e: Exception) {
+                statsigScope.launch(dispatcherProvider.io) {
+                    StatsigUtils.removeFromSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY)
+                }
+            }
+        }
     }
 
     fun bootstrap(initializeValues: String) {
@@ -66,6 +88,8 @@ internal class Store(
             }
             if (downloadedConfigs != null) {
                 setConfigSpecs(downloadedConfigs)
+                cacheByKey[sdkKey] = gson.toJson(downloadedConfigs)
+                StatsigUtils.saveStringToSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY, gson.toJson(cacheByKey))
                 initReason = EvaluationReason.NETWORK
                 return@captureAsync InitializationDetails(0L, true, null)
             }
