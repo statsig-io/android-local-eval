@@ -33,7 +33,6 @@ object Statsig {
      * is invoked
      * @param application - the Android application Statsig is operating in
      * @param sdkKey - a client or test SDK Key from the Statsig console
-     * @param user - the user to associate with feature gate checks, config fetches, and logging
      * @param callback - a callback to execute when initialization is complete
      * @param options - advanced SDK setup
      * Checking Gates/Configs before initialization calls back will return default values
@@ -56,7 +55,6 @@ object Statsig {
      * Initializes the SDK for the given user
      * @param application - the Android application Statsig is operating in
      * @param sdkKey - a client or test SDK Key from the Statsig console
-     * @param user - the user to associate with feature gate checks, config fetches, and logging
      * @param options - advanced SDK setup
      * @return data class containing initialization details (e.g. duration, success), null otherwise
      * @throws IllegalArgumentException if and Invalid SDK Key provided
@@ -72,6 +70,60 @@ object Statsig {
         options: StatsigOptions = StatsigOptions(),
     ): InitializationDetails? {
         return client.initialize(application, sdkKey, options)
+    }
+
+    /**
+     * Get the boolean result of a gate, evaluated against a given user.
+     * An exposure event will automatically be logged for the gate.
+     *
+     * @param user A StatsigUser object used for evaluation
+     * @param gateName The name of the gate being evaluated
+     * @throws IllegalStateException if the SDK has not been initialized
+     */
+    @JvmOverloads
+    @JvmStatic
+    fun checkGate(user: StatsigUser, gateName: String): Boolean {
+        return client.checkGate(user, gateName)
+    }
+
+    /**
+     * Check the value of an Experiment configured in the Statsig console
+     * @param user A StatsigUser object used for the evaluation
+     * @param experimentName the name of the Experiment to check
+     * @return the Dynamic Config backing the experiment
+     * @throws IllegalStateException if the SDK has not been initialized
+     */
+    @JvmOverloads
+    @JvmStatic
+    fun getExperiment(user: StatsigUser, experimentName: String): DynamicConfig {
+        return client.getExperiment(user, experimentName)
+    }
+
+    /**
+     * Get the values of a DynamicConfig, evaluated against the given user.
+     * An exposure event will automatically be logged for the DynamicConfig.
+     *
+     * @param user A StatsigUser object used for evaluation
+     * @param dynamicConfigName The name of the DynamicConfig
+     * @return DynamicConfig object evaluated for the selected StatsigUser
+     * @throws IllegalStateException if the SDK has not been initialized
+     */
+    @JvmOverloads
+    @JvmStatic
+    fun getConfig(user: StatsigUser, dynamicConfigName: String): DynamicConfig {
+        return client.getConfig(user, dynamicConfigName)
+    }
+
+    /**
+     * @param user A StatsigUser object used for the evaluation
+     * @param layerName the name of the Experiment to check
+     * @return the current layer values as a Layer object
+     * @throws IllegalStateException if the SDK has not been initialized
+     */
+    @JvmOverloads
+    @JvmStatic
+    fun getLayer(user: StatsigUser, layerName: String): Layer {
+        return client.getLayer(user, layerName)
     }
 
     /**
