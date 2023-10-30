@@ -32,6 +32,14 @@ internal class Store(
     private var experimentToLayer: Map<String, String> = emptyMap()
     private var cacheByKey: MutableMap<String, String> = mutableMapOf()
 
+    fun getGate(name: String): APIConfig? {
+        return this.gates["name"]
+    }
+
+    fun getConfig(name: String): APIConfig? {
+        return this.dynamicConfigs[name]
+    }
+
     fun syncLoadFromLocalStorage() {
         val cachedConfigSpecs = StatsigUtils.syncGetFromSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY)
         if (cachedConfigSpecs != null) {

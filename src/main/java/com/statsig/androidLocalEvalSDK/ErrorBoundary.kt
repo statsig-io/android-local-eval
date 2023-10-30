@@ -17,7 +17,7 @@ internal class ErrorBoundary() {
 
     private fun handleException(exception: Throwable) {
         if (exception !is ExternalException) {
-            this.logException(exception)
+            this.logException(null, exception)
         }
     }
 
@@ -58,7 +58,7 @@ internal class ErrorBoundary() {
         }
     }
 
-    internal fun logException(exception: Throwable) {
+    internal fun logException(message: String? = "", exception: Throwable) {
         // TODO: Implement
     }
 }
