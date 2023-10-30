@@ -16,8 +16,6 @@ interface IStatsigCallback {
     fun onStatsigInitialize(initDetails: InitializationDetails) {
         return this.onStatsigInitialize()
     }
-
-    fun onStatsigUpdateUser()
 }
 
 /**
@@ -26,7 +24,7 @@ interface IStatsigCallback {
 object Statsig {
 
     @VisibleForTesting
-    internal var client: StatsigClient = StatsigClient()
+    var client: StatsigClient = StatsigClient()
 
     /**
      * Initializes the SDK for the given user.  Initialization is complete when the callback
@@ -78,25 +76,47 @@ object Statsig {
      *
      * @param user A StatsigUser object used for evaluation
      * @param gateName The name of the gate being evaluated
+     * @param option advanced setup for checkGate, for example disable exposure logging
      * @throws IllegalStateException if the SDK has not been initialized
      */
     @JvmOverloads
     @JvmStatic
-    fun checkGate(user: StatsigUser, gateName: String): Boolean {
-        return client.checkGate(user, gateName)
+    fun checkGate(user: StatsigUser, gateName: String, option: CheckGateOptions? = null): Boolean {
+        return client.checkGate(user, gateName, option)
+    }
+
+    /**
+     * Log an exposure for a given gate
+     * @param user A StatsigUser object used for logging
+     * @param gateName the name of the gate to log an exposure for
+     */
+    @JvmStatic
+    fun logGateExposure(user: StatsigUser, gateName: String) {
+        client.logGateExposure(user, gateName)
     }
 
     /**
      * Check the value of an Experiment configured in the Statsig console
      * @param user A StatsigUser object used for the evaluation
      * @param experimentName the name of the Experiment to check
+     * @param option advanced setup for getExperiment, for example disable exposure logging
      * @return the Dynamic Config backing the experiment
      * @throws IllegalStateException if the SDK has not been initialized
      */
     @JvmOverloads
     @JvmStatic
-    fun getExperiment(user: StatsigUser, experimentName: String): DynamicConfig {
-        return client.getExperiment(user, experimentName)
+    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
+        return client.getExperiment(user, experimentName, option)
+    }
+
+    /**
+     * Log an exposure for a given experiment
+     * @param user A StatsigUser object used for logging
+     * @param experimentName the name of the experiment to log an exposure for
+     */
+    @JvmStatic
+    fun logExperimentExposure(user: StatsigUser, configName: String) {
+        client.logExperimentExposure(user, configName)
     }
 
     /**
@@ -105,13 +125,24 @@ object Statsig {
      *
      * @param user A StatsigUser object used for evaluation
      * @param dynamicConfigName The name of the DynamicConfig
+     * @param option advanced setup for getConfig, for example disable exposure logging
      * @return DynamicConfig object evaluated for the selected StatsigUser
      * @throws IllegalStateException if the SDK has not been initialized
      */
     @JvmOverloads
     @JvmStatic
-    fun getConfig(user: StatsigUser, dynamicConfigName: String): DynamicConfig {
-        return client.getConfig(user, dynamicConfigName)
+    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
+        return client.getConfig(user, dynamicConfigName, option)
+    }
+
+    /**
+     * Log an exposure for a given config
+     * @param user A StatsigUser object used for logging
+     * @param configName the name of the experiment to log an exposure for
+     */
+    @JvmStatic
+    fun logConfigExposure(user: StatsigUser, configName: String) {
+        client.logConfigExposure(user, configName)
     }
 
     /**
@@ -122,8 +153,18 @@ object Statsig {
      */
     @JvmOverloads
     @JvmStatic
-    fun getLayer(user: StatsigUser, layerName: String): Layer {
-        return client.getLayer(user, layerName)
+    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
+        return client.getLayer(user, layerName, option)
+    }
+
+    /**
+     * Log an exposure for a given parameter within a layer
+     * @param user A StatsigUser object used for logging
+     * @param configName the name of the experiment to log an exposure for
+     */
+    @JvmStatic
+    fun logLayerParameterExposure(user: StatsigUser, layerName: String, parameterName: String) {
+        client.logLayerParameterExposure(user, layerName, parameterName)
     }
 
     /**

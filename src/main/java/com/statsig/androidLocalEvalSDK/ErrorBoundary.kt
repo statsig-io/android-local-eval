@@ -60,5 +60,7 @@ internal class ErrorBoundary() {
 
     internal fun logException(message: String? = "", exception: Throwable) {
         // TODO: Implement
+        println("catching exception!!")
+        println(exception)
     }
 }
