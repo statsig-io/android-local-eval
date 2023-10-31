@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -35,6 +38,18 @@ class StatsigClient {
     private var initialized = AtomicBoolean(false)
     private var isBootstrapped = AtomicBoolean(false)
 
+    /**
+     * Initializes the SDK for the given user
+     * @param application - the Android application Statsig is operating in
+     * @param sdkKey - a client or test SDK Key from the Statsig console
+     * @param options - advanced SDK setup
+     * @return data class containing initialization details (e.g. duration, success), null otherwise
+     * @throws IllegalArgumentException if and Invalid SDK Key provided
+     * Checking Gates/Configs before initialization calls back will return default values
+     * Logging Events before initialization will drop those events
+     * Susequent calls to initialize will be ignored.  To switch the user or update user values,
+     * use updateUser()
+     */
     suspend fun initialize(
         application: Application,
         sdkKey: String,
@@ -49,6 +64,18 @@ class StatsigClient {
         }
     }
 
+    /**
+     * Initializes the SDK for the given user.  Initialization is complete when the callback
+     * is invoked
+     * @param application - the Android application Statsig is operating in
+     * @param sdkKey - a client or test SDK Key from the Statsig console
+     * @param callback - a callback to execute when initialization is complete
+     * @param options - advanced SDK setup
+     * Checking Gates/Configs before initialization calls back will return default values
+     * Logging Events before initialization will drop those events
+     * Susequent calls to initialize will be ignored.  To switch the user or update user values,
+     * use updateUser()
+     */
     fun initializeAsync(
         application: Application,
         sdkKey: String,
@@ -68,6 +95,14 @@ class StatsigClient {
         })
     }
 
+    /**
+     * Get the boolean result of a gate, evaluated against a given user.
+     * An exposure event will automatically be logged for the gate.
+     *
+     * @param user A StatsigUser object used for evaluation
+     * @param gateName The name of the gate being evaluated
+     * @param option advanced setup for checkGate, for example disable exposure logging
+     */
     fun checkGate(user: StatsigUser, gateName: String, option: CheckGateOptions? = null): Boolean {
         enforceInitialized("checkGate")
         var result = false
@@ -82,11 +117,23 @@ class StatsigClient {
         return result
     }
 
+    /**
+     * Log an exposure for a given gate
+     * @param user A StatsigUser object used for logging
+     * @param gateName the name of the gate to log an exposure for
+     */
     fun logGateExposure(user: StatsigUser, gateName: String) {
         errorBoundary.capture({
         }, tag = "logGateExposure")
     }
 
+    /**
+     * Check the value of an Experiment configured in the Statsig console
+     * @param user A StatsigUser object used for the evaluation
+     * @param experimentName the name of the Experiment to check
+     * @param option advanced setup for getExperiment, for example disable exposure logging
+     * @return the Dynamic Config backing the experiment
+     */
     fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
         enforceInitialized("getExperiment")
         var result = DynamicConfig.empty()
@@ -101,6 +148,11 @@ class StatsigClient {
         return result
     }
 
+    /**
+     * Log an exposure for a given experiment
+     * @param user A StatsigUser object used for logging
+     * @param experimentName the name of the experiment to log an exposure for
+     */
     fun logExperimentExposure(user: StatsigUser, experimentName: String) {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -108,7 +160,15 @@ class StatsigClient {
             logConfigExposureImpl(normalizedUser, experimentName, evaluation, true)
         }, tag = "logExperimentExposure")
     }
-
+    /**
+     * Get the values of a DynamicConfig, evaluated against the given user.
+     * An exposure event will automatically be logged for the DynamicConfig.
+     *
+     * @param user A StatsigUser object used for evaluation
+     * @param dynamicConfigName The name of the DynamicConfig
+     * @param option advanced setup for getConfig, for example disable exposure logging
+     * @return DynamicConfig object evaluated for the selected StatsigUser
+     */
     fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
         enforceInitialized("getConfig")
         var result = DynamicConfig.empty()
@@ -123,6 +183,11 @@ class StatsigClient {
         return result
     }
 
+    /**
+     * Log an exposure for a given config
+     * @param user A StatsigUser object used for logging
+     * @param configName the name of the experiment to log an exposure for
+     */
     fun logConfigExposure(user: StatsigUser, dynamicConfigName: String) {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -131,6 +196,11 @@ class StatsigClient {
         }, tag = "logConfigExposure")
     }
 
+    /**
+     * @param user A StatsigUser object used for the evaluation
+     * @param layerName the name of the Experiment to check
+     * @return the current layer values as a Layer object
+     */
     fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
         enforceInitialized("getLayer")
         var result = Layer.empty(layerName)
@@ -150,6 +220,11 @@ class StatsigClient {
         return result
     }
 
+    /**
+     * Log an exposure for a given parameter within a layer
+     * @param user A StatsigUser object used for logging
+     * @param configName the name of the experiment to log an exposure for
+     */
     fun logLayerParameterExposure(user: StatsigUser, layerName: String, paramName: String) {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -167,6 +242,12 @@ class StatsigClient {
         }, tag = "logLayerExposure")
     }
 
+    /**
+     * Log an event to Statsig for the current user
+     * @param eventName the name of the event to track
+     * @param value an optional value assocaited with the event, for aggregations/analysis
+     * @param metadata an optional map of metadata associated with the event
+     */
     fun logEvent(user: StatsigUser, eventName: String, value: String?, metadata: Map<String, String>?) {
         errorBoundary.capture({
             val event = LogEvent(eventName, value, metadata, user)
@@ -174,11 +255,30 @@ class StatsigClient {
         }, tag = "logEvent")
     }
 
+    /**
+     * Log an event to Statsig for the current user
+     * @param eventName the name of the event to track
+     * @param value an optional value assocaited with the event
+     * @param metadata an optional map of metadata associated with the event
+     */
     fun logEvent(user: StatsigUser, eventName: String, value: Double?, metadata: Map<String, String>?) {
         errorBoundary.capture({
             val event = LogEvent(eventName, value, metadata, user)
             statsigScope.launch { statsigLogger.log(event) }
         }, tag = "logEvent")
+    }
+
+    /**
+     * Informs the Statsig SDK that the client is shutting down to complete cleanup saving state
+     */
+    fun shutdown() {
+        Statsig.client.enforceInitialized("shutdown")
+        runBlocking {
+            withContext(Dispatchers.Main.immediate) {
+                Statsig.client.shutdownSuspend()
+                Statsig.client = StatsigClient()
+            }
+        }
     }
 
     private fun setup(
@@ -285,7 +385,7 @@ class StatsigClient {
 
     internal fun enforceInitialized(functionName: String) {
         if (!this.initialized.get()) {
-            throw IllegalStateException("The SDK must be initialized prior to invoking $functionName")
+            Log.e("STATSIG", "The SDK must be initialized prior to invoking $functionName")
         }
     }
 
