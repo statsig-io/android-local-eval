@@ -163,7 +163,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
             val conditionEnum: ConfigCondition? = try {
                 ConfigCondition.valueOf(condition.type.uppercase())
             } catch (e: java.lang.IllegalArgumentException) {
-                errorBoundary.logException("evaluateCondition:condition", e)
+                errorBoundary.logException(e, tag = "evaluateCondition:condition")
                 null
             }
 
@@ -470,7 +470,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                 }
             }
         } catch (e: IllegalArgumentException) {
-            errorBoundary.logException("evaluateCondition:all", e)
+            errorBoundary.logException(e, tag = "evaluateCondition:all")
             return ConfigEvaluation(true)
         }
     }
@@ -502,7 +502,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         } catch (e: NumberFormatException) {
             false
         } catch (e: Exception) {
-            errorBoundary.logException("versionCompareHelper", e)
+            errorBoundary.logException(e, tag = "versionCompareHelper")
             false
         }
     }

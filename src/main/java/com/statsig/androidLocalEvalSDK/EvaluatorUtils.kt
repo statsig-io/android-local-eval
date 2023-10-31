@@ -184,7 +184,7 @@ internal object EvaluatorUtils {
                 val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
                 return format.parse(input)
             } catch (e: Exception) {
-                Statsig.client.errorBoundary.logException("getDate", e)
+                Statsig.client.errorBoundary.logException(e, null, "genDate")
                 null
             }
         }
