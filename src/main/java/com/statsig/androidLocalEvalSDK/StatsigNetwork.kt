@@ -35,8 +35,12 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
     private val gson = StatsigUtils.getGson()
 
     suspend fun postLogs(events: List<LogEvent>, statsigMetadata: StatsigMetadata) {
-        var code: Int? = null
         val requestBody = gson.toJson(mapOf("events" to events, "statsigMetadata" to statsigMetadata))
+        postLogs(requestBody)
+    }
+
+    suspend fun postLogs(requestBody: String) {
+        var code: Int? = null
         try {
             postRequest(options.eventLoggingAPI, requestBody, 3, callback = { statusCode: Int? -> code = statusCode })
             if (code !in 200..299) {

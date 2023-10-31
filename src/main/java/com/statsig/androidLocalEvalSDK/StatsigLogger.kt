@@ -1,5 +1,6 @@
 package com.statsig.androidLocalEvalSDK
 
+import android.content.SharedPreferences
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -157,6 +158,19 @@ internal class StatsigLogger(
                 layerExposureMetadata.secondaryExposures,
             )
             log(event)
+        }
+    }
+
+    fun retryFailedLog(sharedPrefs: SharedPreferences) {
+        coroutineScope.launch (CoroutineDispatcherProvider().io){
+            val savedLogs = StatsigUtils.getSavedLogs(sharedPrefs)
+            if(savedLogs.isEmpty()) {
+               return@launch
+            }
+            StatsigUtils.removeFromSharedPrefs(sharedPrefs, OFFLINE_LOGS_KEY)
+            savedLogs.map {
+                network.postLogs(it.requestBody)
+            }
         }
     }
 

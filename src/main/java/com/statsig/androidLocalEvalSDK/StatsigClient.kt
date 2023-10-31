@@ -217,6 +217,7 @@ class StatsigClient {
         return withContext(dispatcherProvider.io) {
             val initStartTime = StatsigUtils.getTimeInMillis()
             return@withContext errorBoundary.captureAsync({
+                statsigLogger.retryFailedLog(sharedPrefs)
                 if (this@StatsigClient.isBootstrapped.get()) {
                     return@captureAsync InitializationDetails(System.currentTimeMillis() - initStartTime, true, null)
                 }
