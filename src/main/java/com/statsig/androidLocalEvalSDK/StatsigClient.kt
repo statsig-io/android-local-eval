@@ -17,9 +17,10 @@ private const val SHARED_PREFERENCES_KEY: String = "com.statsig.androidsdk"
 
 class StatsigClient {
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
-    internal lateinit var options: StatsigOptions
-    internal lateinit var statsigNetwork: StatsigNetwork
+    private lateinit var options: StatsigOptions
+    private lateinit var statsigNetwork: StatsigNetwork
     private lateinit var evaluator: Evaluator
+    private lateinit var statsigLogger: StatsigLogger
     private lateinit var application: Application
     private lateinit var sdkKey: String
     private lateinit var statsigMetadata: StatsigMetadata
@@ -67,47 +68,117 @@ class StatsigClient {
         })
     }
 
-    fun checkGate(user: StatsigUser, gateName: String): Boolean {
+    fun checkGate(user: StatsigUser, gateName: String, option: CheckGateOptions? = null): Boolean {
         enforceInitialized("checkGate")
         var result = false
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            result = evaluator.checkGate(normalizedUser, gateName).booleanValue
+            val evaluation = evaluator.checkGate(normalizedUser, gateName)
+            result = evaluation.booleanValue
+            if (option?.disableExposureLogging !== true) {
+                logGateExposureImpl(normalizedUser, gateName, evaluation)
+            }
         }, tag = "checkGate")
         return result
     }
 
-    fun getExperiment(user: StatsigUser, experimentName: String): DynamicConfig {
+    fun logGateExposure(user: StatsigUser, gateName: String) {
+        errorBoundary.capture({
+        }, tag = "logGateExposure")
+    }
+
+    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
         enforceInitialized("getExperiment")
         var result = DynamicConfig.empty()
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, experimentName)
             result = getDynamicConfigFromEvalResult(evaluation, normalizedUser, experimentName)
+            if (option?.disableExposureLogging !== true) {
+                logConfigExposureImpl(normalizedUser, experimentName, evaluation)
+            }
         }, tag = "getExperiment")
         return result
     }
 
-    fun getConfig(user: StatsigUser, dynamicConfigName: String): DynamicConfig {
+    fun logExperimentExposure(user: StatsigUser, experimentName: String) {
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.getConfig(normalizedUser, experimentName)
+            logConfigExposureImpl(normalizedUser, experimentName, evaluation, true)
+        }, tag = "logExperimentExposure")
+    }
+
+    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
         enforceInitialized("getConfig")
         var result = DynamicConfig.empty()
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
             result = getDynamicConfigFromEvalResult(evaluation, normalizedUser, dynamicConfigName)
+            if (option?.disableExposureLogging !== true) {
+                logConfigExposureImpl(normalizedUser, dynamicConfigName, evaluation)
+            }
         }, tag = "getConfig")
         return result
     }
 
-    fun getLayer(user: StatsigUser, layerName: String): Layer {
+    fun logConfigExposure(user: StatsigUser, dynamicConfigName: String) {
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
+            logConfigExposureImpl(normalizedUser, dynamicConfigName, evaluation, true)
+        }, tag = "logConfigExposure")
+    }
+
+    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
         enforceInitialized("getLayer")
         var result = Layer.empty(layerName)
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getLayer(normalizedUser, layerName)
-            result = Layer(layerName, evaluation.ruleID, evaluation.groupName, evaluation.jsonValue as? Map<String, Any> ?: mapOf(), evaluation.secondaryExposures, evaluation.configDelegate ?: "")
-        }, tag = "getConfig")
+            result = Layer(
+                layerName,
+                evaluation.ruleID,
+                evaluation.groupName,
+                evaluation.jsonValue as? Map<String, Any> ?: mapOf(),
+                evaluation.secondaryExposures,
+                evaluation.configDelegate ?: "",
+                onExposure = getExposureFun(option?.disableExposureLogging == true, evaluation, normalizedUser),
+            )
+        }, tag = "getLayer")
         return result
+    }
+
+    fun logLayerParameterExposure(user: StatsigUser, layerName: String, paramName: String) {
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.getLayer(normalizedUser, layerName)
+            val layer = Layer(
+                layerName,
+                evaluation.ruleID,
+                evaluation.groupName,
+                evaluation.jsonValue as? Map<String, Any> ?: mapOf(),
+                evaluation.secondaryExposures,
+                evaluation.configDelegate ?: "",
+            )
+            val layerExposureMetadata = createLayerExposureMetadata(layer, paramName, evaluation)
+            statsigLogger.logLayerExposure(normalizedUser, layerExposureMetadata)
+        }, tag = "logLayerExposure")
+    }
+
+    fun logEvent(user: StatsigUser, eventName: String, value: String?, metadata: Map<String, String>?) {
+        errorBoundary.capture({
+            val event = LogEvent(eventName, value, metadata, user)
+            statsigScope.launch { statsigLogger.log(event) }
+        }, tag = "logEvent")
+    }
+
+    fun logEvent(user: StatsigUser, eventName: String, value: Double?, metadata: Map<String, String>?) {
+        errorBoundary.capture({
+            val event = LogEvent(eventName, value, metadata, user)
+            statsigScope.launch { statsigLogger.log(event) }
+        }, tag = "logEvent")
     }
 
     private fun setup(
@@ -115,20 +186,18 @@ class StatsigClient {
         sdkKey: String,
         options: StatsigOptions = StatsigOptions(),
     ) {
-        if (!sdkKey.startsWith("client-") && !sdkKey.startsWith("test-")) {
-            throw IllegalArgumentException("Invalid SDK Key provided.  You must provide a client SDK Key from the API Key page of your Statsig console")
-        }
         errorBoundary.setKey(sdkKey)
+        exceptionHandler = errorBoundary.getExceptionHandler()
         this.application = application
         this.sdkKey = sdkKey
         this.options = options
+        statsigScope = CoroutineScope(statsigJob + dispatcherProvider.main + exceptionHandler)
         sharedPrefs = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-        statsigNetwork = StatsigNetwork(sdkKey)
+        statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs)
         statsigMetadata = StatsigMetadata()
         errorBoundary.setMetadata(statsigMetadata)
-        exceptionHandler = errorBoundary.getExceptionHandler()
         populateStatsigMetadata()
-        statsigScope = CoroutineScope(statsigJob + dispatcherProvider.main + exceptionHandler)
+        statsigLogger = StatsigLogger(statsigScope, statsigNetwork, statsigMetadata)
         specStore = Store(sdkKey, statsigNetwork, options, statsigMetadata, statsigScope, sharedPrefs, errorBoundary)
         evaluator = Evaluator(specStore, statsigNetwork, options, statsigMetadata, statsigScope, errorBoundary)
         // load cache
@@ -169,7 +238,9 @@ class StatsigClient {
         if (user != null) {
             normalizedUser = user.getCopyForEvaluation()
         }
-        normalizedUser.statsigEnvironment = options.getEnvironment()
+        if(options.getEnvironment() != null)  {
+            normalizedUser.statsigEnvironment = options.getEnvironment()
+        }
         return normalizedUser
     }
 
@@ -195,6 +266,18 @@ class StatsigClient {
         }
     }
 
+    private fun getExposureFun(exposureDisabled: Boolean, configEvaluation: ConfigEvaluation, user: StatsigUser): OnLayerExposureInternal? {
+        return if (exposureDisabled) {
+            null
+        } else {
+            {
+                    layer, parameterName ->
+                val exposureMetadata = createLayerExposureMetadata(layer, parameterName, configEvaluation)
+                statsigLogger.logLayerExposure(user, exposureMetadata)
+            }
+        }
+    }
+
     internal fun isInitialized(): Boolean {
         return this.initialized.get()
     }
@@ -213,11 +296,20 @@ class StatsigClient {
     }
 
     private suspend fun shutdownImpl() {
+        statsigLogger.shutdown()
         pollingJob?.cancel()
         initialized = AtomicBoolean()
         isBootstrapped = AtomicBoolean()
         errorBoundary = ErrorBoundary()
         statsigJob = SupervisorJob()
+    }
+
+    private fun logConfigExposureImpl(user: StatsigUser, configName: String, evaluation: ConfigEvaluation, isManualExposure: Boolean = false) {
+        statsigLogger.logConfigExposure(user, configName, evaluation.ruleID, evaluation.secondaryExposures, isManualExposure, evaluation.evaluationDetails)
+    }
+
+    private fun logGateExposureImpl(user: StatsigUser, configName: String, evaluation: ConfigEvaluation, isManualExposure: Boolean = false) {
+        statsigLogger.logGateExposure(user, configName, evaluation.booleanValue, evaluation.ruleID, evaluation.secondaryExposures, isManualExposure, evaluation.evaluationDetails)
     }
 
     private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, user: StatsigUser, configName: String): DynamicConfig {

@@ -92,3 +92,8 @@ class StatsigOptions(
         )
     }
 }
+
+data class CheckGateOptions(var disableExposureLogging: Boolean = false)
+data class GetConfigOptions(var disableExposureLogging: Boolean = false)
+data class GetLayerOptions(var disableExposureLogging: Boolean = false)
+data class GetExperimentOptions(var disableExposureLogging: Boolean = false)

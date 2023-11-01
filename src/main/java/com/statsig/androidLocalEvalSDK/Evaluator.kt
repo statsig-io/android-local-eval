@@ -13,7 +13,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
     fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
         // TODO(xinli) Override logic
-
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
