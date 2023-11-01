@@ -13,6 +13,10 @@ internal object StatsigUtils {
         return System.currentTimeMillis()
     }
 
+    fun toStringOrEmpty(value: Any?): String {
+        return value?.toString() ?: ""
+    }
+
     internal fun getGson(): Gson {
         return GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE).create()
     }
