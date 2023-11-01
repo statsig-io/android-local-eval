@@ -1,6 +1,8 @@
 package com.statsig.androidLocalEvalSDK
 
 import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -10,6 +12,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+
+private const val SHARED_PREFERENCES_KEY: String = "com.statsig.androidsdk"
 
 class StatsigClient {
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
@@ -22,6 +26,7 @@ class StatsigClient {
     private lateinit var exceptionHandler: CoroutineExceptionHandler
     private lateinit var statsigScope: CoroutineScope
     private lateinit var specStore: Store
+    private lateinit var sharedPrefs: SharedPreferences
 
     private var pollingJob: Job? = null
     private var statsigJob = SupervisorJob()
@@ -74,13 +79,14 @@ class StatsigClient {
         this.application = application
         this.sdkKey = sdkKey
         this.options = options
+        sharedPrefs = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
         statsigNetwork = StatsigNetwork(sdkKey)
         statsigMetadata = StatsigMetadata()
         errorBoundary.setMetadata(statsigMetadata)
         exceptionHandler = errorBoundary.getExceptionHandler()
         populateStatsigMetadata()
         statsigScope = CoroutineScope(statsigJob + dispatcherProvider.main + exceptionHandler)
-        specStore = Store(statsigNetwork, options, statsigMetadata, statsigScope, errorBoundary)
+        specStore = Store(sdkKey, statsigNetwork, options, statsigMetadata, statsigScope, sharedPrefs, errorBoundary)
         evaluator = Evaluator(specStore, statsigNetwork, options, statsigMetadata, statsigScope, errorBoundary)
         // load cache
         if (!options.loadCacheAsync) {
