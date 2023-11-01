@@ -11,6 +11,41 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
     private val calendarTwo = Calendar.getInstance()
     private var hashLookupTable: MutableMap<String, ULong> = HashMap()
 
+    fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
+        // TODO(xinli) Override logic
+
+        if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
+            return ConfigEvaluation(
+                evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
+            )
+        }
+
+        val evalGate = specStore.getGate(name)
+        return this.evaluateConfig(user, evalGate)
+    }
+
+    fun getConfig(user: StatsigUser, configName: String): ConfigEvaluation {
+        // TODO(xinli): implement override
+        if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
+            return ConfigEvaluation(
+                evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
+            )
+        }
+        return evaluateConfig(user, specStore.getConfig(configName))
+    }
+
+    fun getLayer(user: StatsigUser, layerName: String): ConfigEvaluation {
+        // TODO(xinli): implement override
+
+        if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
+            return ConfigEvaluation(
+                evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
+            )
+        }
+
+        return this.evaluateConfig(user, specStore.getLayerConfig(layerName))
+    }
+
     private fun evaluateConfig(user: StatsigUser, config: APIConfig?): ConfigEvaluation {
         val unwrappedConfig =
             config
@@ -120,19 +155,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         )
         evaluation.undelegatedSecondaryExposures = undelegatedSecondaryExposures
         return evaluation
-    }
-
-    private fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
-        // TODO(xinli) Override logic
-
-        if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
-            return ConfigEvaluation(
-                evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
-            )
-        }
-
-        val evalGate = specStore.getGate(name)
-        return this.evaluateConfig(user, evalGate)
     }
 
     private fun evaluateCondition(user: StatsigUser, condition: APICondition): ConfigEvaluation {

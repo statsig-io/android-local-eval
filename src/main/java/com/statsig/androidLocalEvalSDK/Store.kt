@@ -33,11 +33,15 @@ internal class Store(
     private var cacheByKey: MutableMap<String, String> = mutableMapOf()
 
     fun getGate(name: String): APIConfig? {
-        return this.gates["name"]
+        return this.gates[name]
     }
 
     fun getConfig(name: String): APIConfig? {
         return this.dynamicConfigs[name]
+    }
+
+    fun getLayerConfig(name: String): APIConfig? {
+        return this.layerConfigs[name]
     }
 
     fun syncLoadFromLocalStorage() {

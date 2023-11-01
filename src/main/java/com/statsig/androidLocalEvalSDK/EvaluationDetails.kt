@@ -1,6 +1,6 @@
 package com.statsig.androidLocalEvalSDK
 
-internal class EvaluationDetails(
+class EvaluationDetails(
     var configSyncTime: Long,
     var reason: EvaluationReason,
 ) {

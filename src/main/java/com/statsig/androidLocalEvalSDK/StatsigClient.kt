@@ -67,6 +67,49 @@ class StatsigClient {
         })
     }
 
+    fun checkGate(user: StatsigUser, gateName: String): Boolean {
+        enforceInitialized("checkGate")
+        var result = false
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            result = evaluator.checkGate(normalizedUser, gateName).booleanValue
+        }, tag = "checkGate")
+        return result
+    }
+
+    fun getExperiment(user: StatsigUser, experimentName: String): DynamicConfig {
+        enforceInitialized("getExperiment")
+        var result = DynamicConfig.empty()
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.getConfig(normalizedUser, experimentName)
+            result = getDynamicConfigFromEvalResult(evaluation, normalizedUser, experimentName)
+        }, tag = "getExperiment")
+        return result
+    }
+
+    fun getConfig(user: StatsigUser, dynamicConfigName: String): DynamicConfig {
+        enforceInitialized("getConfig")
+        var result = DynamicConfig.empty()
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
+            result = getDynamicConfigFromEvalResult(evaluation, normalizedUser, dynamicConfigName)
+        }, tag = "getConfig")
+        return result
+    }
+
+    fun getLayer(user: StatsigUser, layerName: String): Layer {
+        enforceInitialized("getLayer")
+        var result = Layer.empty(layerName)
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.getLayer(normalizedUser, layerName)
+            result = Layer(layerName, evaluation.ruleID, evaluation.groupName, evaluation.jsonValue as? Map<String, Any> ?: mapOf(), evaluation.secondaryExposures, evaluation.configDelegate ?: "")
+        }, tag = "getConfig")
+        return result
+    }
+
     private fun setup(
         application: Application,
         sdkKey: String,
@@ -175,5 +218,9 @@ class StatsigClient {
         isBootstrapped = AtomicBoolean()
         errorBoundary = ErrorBoundary()
         statsigJob = SupervisorJob()
+    }
+
+    private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, user: StatsigUser, configName: String): DynamicConfig {
+        return DynamicConfig(configName, result.jsonValue as? Map<String, Any> ?: mapOf(), result.ruleID, result.groupName, result.secondaryExposures)
     }
 }
