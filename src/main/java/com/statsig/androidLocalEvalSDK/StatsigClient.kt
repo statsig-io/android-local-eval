@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +22,9 @@ private const val SHARED_PREFERENCES_KEY: String = "com.statsig.androidsdk"
 class StatsigClient {
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
     private lateinit var options: StatsigOptions
-    private lateinit var statsigNetwork: StatsigNetwork
+
+    @VisibleForTesting
+    internal lateinit var statsigNetwork: StatsigNetwork
     private lateinit var evaluator: Evaluator
     private lateinit var statsigLogger: StatsigLogger
     private lateinit var application: Application
@@ -50,6 +53,7 @@ class StatsigClient {
      * Susequent calls to initialize will be ignored.  To switch the user or update user values,
      * use updateUser()
      */
+    @JvmOverloads
     suspend fun initialize(
         application: Application,
         sdkKey: String,
@@ -76,6 +80,7 @@ class StatsigClient {
      * Susequent calls to initialize will be ignored.  To switch the user or update user values,
      * use updateUser()
      */
+    @JvmOverloads
     fun initializeAsync(
         application: Application,
         sdkKey: String,
@@ -103,8 +108,11 @@ class StatsigClient {
      * @param gateName The name of the gate being evaluated
      * @param option advanced setup for checkGate, for example disable exposure logging
      */
+    @JvmOverloads
     fun checkGate(user: StatsigUser, gateName: String, option: CheckGateOptions? = null): Boolean {
-        enforceInitialized("checkGate")
+        if (!isInitialized("checkGate")) {
+            return false
+        }
         var result = false
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -123,6 +131,9 @@ class StatsigClient {
      * @param gateName the name of the gate to log an exposure for
      */
     fun logGateExposure(user: StatsigUser, gateName: String) {
+        if (!isInitialized("getExperiment")) {
+            return
+        }
         errorBoundary.capture({
         }, tag = "logGateExposure")
     }
@@ -134,8 +145,10 @@ class StatsigClient {
      * @param option advanced setup for getExperiment, for example disable exposure logging
      * @return the Dynamic Config backing the experiment
      */
-    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
-        enforceInitialized("getExperiment")
+    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig? {
+        if (!isInitialized("getExperiment")) {
+            return null
+        }
         var result = DynamicConfig.empty()
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -160,6 +173,7 @@ class StatsigClient {
             logConfigExposureImpl(normalizedUser, experimentName, evaluation, true)
         }, tag = "logExperimentExposure")
     }
+
     /**
      * Get the values of a DynamicConfig, evaluated against the given user.
      * An exposure event will automatically be logged for the DynamicConfig.
@@ -169,8 +183,10 @@ class StatsigClient {
      * @param option advanced setup for getConfig, for example disable exposure logging
      * @return DynamicConfig object evaluated for the selected StatsigUser
      */
-    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
-        enforceInitialized("getConfig")
+    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig? {
+        if (!isInitialized("getConfig")) {
+            return null
+        }
         var result = DynamicConfig.empty()
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -189,6 +205,9 @@ class StatsigClient {
      * @param configName the name of the experiment to log an exposure for
      */
     fun logConfigExposure(user: StatsigUser, dynamicConfigName: String) {
+        if (!isInitialized("logConfigExposure")) {
+            return
+        }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
@@ -201,8 +220,10 @@ class StatsigClient {
      * @param layerName the name of the Experiment to check
      * @return the current layer values as a Layer object
      */
-    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
-        enforceInitialized("getLayer")
+    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer? {
+        if (!isInitialized("getLayer")) {
+            return null
+        }
         var result = Layer.empty(layerName)
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
@@ -226,6 +247,9 @@ class StatsigClient {
      * @param configName the name of the experiment to log an exposure for
      */
     fun logLayerParameterExposure(user: StatsigUser, layerName: String, paramName: String) {
+        if (!isInitialized("logLayerParameterExposure")) {
+            return
+        }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getLayer(normalizedUser, layerName)
@@ -249,6 +273,9 @@ class StatsigClient {
      * @param metadata an optional map of metadata associated with the event
      */
     fun logEvent(user: StatsigUser, eventName: String, value: String?, metadata: Map<String, String>?) {
+        if (!isInitialized("logEvent")) {
+            return
+        }
         errorBoundary.capture({
             val event = LogEvent(eventName, value, metadata, user)
             statsigScope.launch { statsigLogger.log(event) }
@@ -262,6 +289,9 @@ class StatsigClient {
      * @param metadata an optional map of metadata associated with the event
      */
     fun logEvent(user: StatsigUser, eventName: String, value: Double?, metadata: Map<String, String>?) {
+        if (!isInitialized("logEvent")) {
+            return
+        }
         errorBoundary.capture({
             val event = LogEvent(eventName, value, metadata, user)
             statsigScope.launch { statsigLogger.log(event) }
@@ -272,10 +302,12 @@ class StatsigClient {
      * Informs the Statsig SDK that the client is shutting down to complete cleanup saving state
      */
     fun shutdown() {
-        Statsig.client.enforceInitialized("shutdown")
+        if (!isInitialized("shutdown")) {
+            return
+        }
         runBlocking {
             withContext(Dispatchers.Main.immediate) {
-                Statsig.client.shutdownSuspend()
+                shutdownSuspend()
                 Statsig.client = StatsigClient()
             }
         }
@@ -293,12 +325,15 @@ class StatsigClient {
         this.options = options
         statsigScope = CoroutineScope(statsigJob + dispatcherProvider.main + exceptionHandler)
         sharedPrefs = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-        statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs)
+        if (statsigNetwork == null) {
+            // For testing purpose, prevent mocked network be overwritten
+            statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs, errorBoundary)
+        }
         statsigMetadata = StatsigMetadata()
         errorBoundary.setMetadata(statsigMetadata)
         populateStatsigMetadata()
         statsigLogger = StatsigLogger(statsigScope, statsigNetwork, statsigMetadata)
-        specStore = Store(sdkKey, statsigNetwork, options, statsigMetadata, statsigScope, sharedPrefs, errorBoundary)
+        specStore = Store(sdkKey, statsigNetwork, statsigScope, sharedPrefs, errorBoundary)
         evaluator = Evaluator(specStore, statsigNetwork, options, statsigMetadata, statsigScope, errorBoundary)
         // load cache
         if (!options.loadCacheAsync) {
@@ -339,7 +374,7 @@ class StatsigClient {
         if (user != null) {
             normalizedUser = user.getCopyForEvaluation()
         }
-        if(options.getEnvironment() != null)  {
+        if (options.getEnvironment() != null) {
             normalizedUser.statsigEnvironment = options.getEnvironment()
         }
         return normalizedUser
@@ -383,14 +418,18 @@ class StatsigClient {
         return this.initialized.get()
     }
 
-    internal fun enforceInitialized(functionName: String) {
+    internal fun isInitialized(functionName: String): Boolean {
         if (!this.initialized.get()) {
             Log.e("STATSIG", "The SDK must be initialized prior to invoking $functionName")
+            return false
         }
+        return true
     }
 
     suspend fun shutdownSuspend() {
-        enforceInitialized("shutdownSuspend")
+        if (!isInitialized("shutdownSuspend")) {
+            return
+        }
         errorBoundary.captureAsync {
             shutdownImpl()
         }
@@ -414,6 +453,6 @@ class StatsigClient {
     }
 
     private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, user: StatsigUser, configName: String): DynamicConfig {
-        return DynamicConfig(configName, result.jsonValue as? Map<String, Any> ?: mapOf(), result.ruleID, result.groupName, result.secondaryExposures)
+        return DynamicConfig(configName, result.jsonValue as? Map<String, Any> ?: mapOf(), result.ruleID, result.groupName, result.secondaryExposures, result.evaluationDetails)
     }
 }

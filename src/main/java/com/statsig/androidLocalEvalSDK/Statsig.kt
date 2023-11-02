@@ -1,11 +1,5 @@
 package com.statsig.androidLocalEvalSDK
 
-import android.app.Application
-import androidx.annotation.VisibleForTesting
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-
 /**
  * Callback interface for Statsig calls. All callbacks will be run on the main thread.
  */
