@@ -1,6 +1,10 @@
 package com.statsig.androidLocalEvalSDK
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
+import java.io.DataOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 internal class ExternalException(message: String? = null) : Exception(message)
 
@@ -15,9 +19,9 @@ internal class ErrorBoundary() {
         this.apiKey = apiKey
     }
 
-    private fun handleException(exception: Throwable) {
+    private fun handleException(exception: Throwable, tag: String? = null) {
         if (exception !is ExternalException) {
-            this.logException(null, exception)
+            this.logException(exception, tag = tag)
         }
     }
 
@@ -31,7 +35,7 @@ internal class ErrorBoundary() {
         try {
             task()
         } catch (e: Exception) {
-            handleException(e)
+            handleException(e, tag)
             recover?.let { it() }
         }
     }
@@ -58,9 +62,38 @@ internal class ErrorBoundary() {
         }
     }
 
-    internal fun logException(message: String? = "", exception: Throwable) {
-        // TODO: Implement
-        println("catching exception!!")
-        println(exception)
+    internal fun logException(exception: Throwable, message: String? = null, tag: String? = null) {
+        try {
+            Log.e("STATSIG", "An unexpected exception occured: " + exception)
+            if (message != null) {
+                Log.e("STATSIG", message)
+            }
+            val name = exception.javaClass.canonicalName ?: exception.javaClass.name
+            if (seen.contains(name)) {
+                return
+            }
+            seen.add(name)
+
+            val metadata = statsigMetadata ?: StatsigMetadata("")
+            val body = mapOf(
+                "exception" to name,
+                "info" to RuntimeException(exception).stackTraceToString(),
+                "statsigMetadata" to metadata,
+                "functionName" to tag,
+
+            )
+            val postData = StatsigUtils.getGson().toJson(body)
+
+            val conn = URL(urlString).openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("STATSIG-API-KEY", apiKey)
+            conn.useCaches = false
+
+            DataOutputStream(conn.outputStream).use { it.writeBytes(postData) }
+            conn.responseCode // triggers request
+        } catch (e: Exception) {
+        }
     }
 }
