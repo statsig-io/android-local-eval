@@ -1,4 +1,4 @@
 root=true
 [*.{kt,kts}]
 ktlint_standard_no-wildcard-imports = disabled
-ktlint_standard_comsl webment-wrapping = disabled
+ktlint_standard_comment-wrapping = disabled
