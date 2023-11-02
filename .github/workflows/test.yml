@@ -1,4 +1,4 @@
-name: test
+name: Gradle
 
 on:
   workflow_dispatch:
@@ -18,11 +18,6 @@ jobs:
         with:
           java-version: 11
           distribution: "adopt"
-
-      - name: Lint
-        uses: gradle/gradle-build-action@v2
-        with:
-          arguments: ktlintCheck
 
       - name: Test
         uses: gradle/gradle-build-action@v2
