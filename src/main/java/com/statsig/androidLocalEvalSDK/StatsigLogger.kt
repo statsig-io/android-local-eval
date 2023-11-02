@@ -162,10 +162,10 @@ internal class StatsigLogger(
     }
 
     fun retryFailedLog(sharedPrefs: SharedPreferences) {
-        coroutineScope.launch (CoroutineDispatcherProvider().io){
+        coroutineScope.launch(CoroutineDispatcherProvider().io) {
             val savedLogs = StatsigUtils.getSavedLogs(sharedPrefs)
-            if(savedLogs.isEmpty()) {
-               return@launch
+            if (savedLogs.isEmpty()) {
+                return@launch
             }
             StatsigUtils.removeFromSharedPrefs(sharedPrefs, OFFLINE_LOGS_KEY)
             savedLogs.map {

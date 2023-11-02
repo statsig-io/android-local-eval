@@ -12,7 +12,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
     private var hashLookupTable: MutableMap<String, ULong> = HashMap()
 
     fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
-        // TODO(xinli) Override logic
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
@@ -80,7 +79,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
             secondaryExposures.addAll(result.secondaryExposures)
             if (result.booleanValue) {
                 val delegatedEval = this.evaluateDelegate(user, rule, secondaryExposures)
-                if(delegatedEval != null) {
+                if (delegatedEval != null) {
                     return delegatedEval
                 }
                 val pass = evaluatePassPercent(user, config, rule)

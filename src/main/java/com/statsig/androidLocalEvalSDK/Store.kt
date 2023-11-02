@@ -5,7 +5,6 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 
@@ -14,8 +13,6 @@ private const val CACHE_BY_SDK_KEY: String = "Statsig.CACHE_BY_KEY"
 internal class Store(
     private val sdkKey: String,
     private var network: StatsigNetwork,
-    private var options: StatsigOptions,
-    private var statsigMetadata: StatsigMetadata,
     private var statsigScope: CoroutineScope,
     private val sharedPrefs: SharedPreferences,
     private val errorBoundary: ErrorBoundary,
@@ -47,16 +44,20 @@ internal class Store(
     fun syncLoadFromLocalStorage() {
         val cachedConfigSpecs = StatsigUtils.syncGetFromSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY)
         if (cachedConfigSpecs != null) {
-            try {
+            errorBoundary.capture({
                 val cacheByKeyType = object : TypeToken<MutableMap<String, String>>() {}.type
                 cacheByKey = gson.fromJson(cachedConfigSpecs, cacheByKeyType)
+                if (cacheByKey[sdkKey] == null) {
+                    return@capture
+                }
                 val currentCache = gson.fromJson(cacheByKey[sdkKey], APIDownloadedConfigs::class.java)
                 setConfigSpecs(currentCache)
-            } catch (e: Exception) {
+                initReason = EvaluationReason.CACHE
+            }, tag = "loadCache", {
                 statsigScope.launch(dispatcherProvider.io) {
                     StatsigUtils.removeFromSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY)
                 }
-            }
+            })
         }
     }
 
@@ -80,23 +81,8 @@ internal class Store(
         // network fetch
         var statusCode: Int? = null
         return errorBoundary.captureAsync({
-            val endpoint = network.getURLForDownloadConfigSpec(options.configSpecApi)
-            val downloadedConfigs = if (options.initTimeoutMs == 0) {
-                network.getRequest<APIDownloadedConfigs>(
-                    endpoint,
-                    2,
-                    null,
-                    { code: Int? -> statusCode = code },
-                )
-            } else {
-                withTimeout(options.initTimeoutMs.toLong()) {
-                    network.getRequest<APIDownloadedConfigs>(
-                        endpoint,
-                        2,
-                        options.initTimeoutMs,
-                        { code: Int? -> statusCode = code },
-                    )
-                }
+            val downloadedConfigs = network.getDownloadConfigSpec { code ->
+                statusCode = code
             }
             if (downloadedConfigs != null) {
                 setConfigSpecs(downloadedConfigs)
@@ -115,7 +101,6 @@ internal class Store(
                 is TimeoutCancellationException -> {
                     InitializeResponse.FailedInitializeResponse(InitializeFailReason.CoroutineTimeout, it)
                 }
-
                 else -> {
                     InitializeResponse.FailedInitializeResponse(InitializeFailReason.InternalError, it)
                 }

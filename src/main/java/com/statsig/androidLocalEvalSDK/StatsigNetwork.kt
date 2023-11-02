@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.pow
@@ -19,7 +20,7 @@ private const val STATSIG_SDK_TYPE_KEY = "STATSIG-SDK-TYPE"
 private const val STATSIG_SDK_VERSION_KEY = "STATSIG-SDK-VERSION"
 private const val ACCEPT_HEADER_KEY = "Accept"
 private const val ACCEPT_HEADER_VALUE = "application/json"
-
+private const val RETRY_LIMIT = 2
 private val RETRY_CODES: IntArray = intArrayOf(
     HttpURLConnection.HTTP_CLIENT_TIMEOUT,
     HttpURLConnection.HTTP_INTERNAL_ERROR,
@@ -30,7 +31,7 @@ private val RETRY_CODES: IntArray = intArrayOf(
     524,
     599,
 )
-internal class StatsigNetwork(private val sdkKey: String, private val options: StatsigOptions, private val sharedPrefs: SharedPreferences) {
+internal class StatsigNetwork(private val sdkKey: String, private val options: StatsigOptions, private val sharedPrefs: SharedPreferences, private val errorBoundary: ErrorBoundary) {
     private val dispatcherProvider = CoroutineDispatcherProvider()
     private val gson = StatsigUtils.getGson()
 
@@ -48,6 +49,27 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
             }
         } catch (e: Exception) {
             addFailedLogRequest(requestBody)
+        }
+    }
+
+    suspend fun getDownloadConfigSpec(callback: (statusCode: Int?) -> Unit): APIDownloadedConfigs? {
+        val endpoint = getURLForDownloadConfigSpec(options.configSpecApi)
+        if (options.initTimeoutMs == 0) {
+            return getRequest(
+                endpoint,
+                RETRY_LIMIT,
+                null,
+                callback,
+            )
+        } else {
+            return withTimeout(options.initTimeoutMs.toLong()) {
+                getRequest(
+                    endpoint,
+                    RETRY_LIMIT,
+                    options.initTimeoutMs,
+                    callback,
+                )
+            }
         }
     }
 
