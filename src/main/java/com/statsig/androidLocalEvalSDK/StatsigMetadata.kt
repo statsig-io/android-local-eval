@@ -11,7 +11,7 @@ internal data class StatsigMetadata(
     @SerializedName("deviceModel") var deviceModel: String? = Build.MODEL,
     @SerializedName("deviceOS") var deviceOS: String = "Android",
     @SerializedName("language") var language: String? = Locale.getDefault().displayLanguage,
-    @SerializedName("sdkType") var sdkType: String? = "android-client",
+    @SerializedName("sdkType") var sdkType: String? = "android-on-device-evaluations",
     @SerializedName("sdkVersion") var sdkVersion: String? = BuildConfig.VERSION_NAME,
     @SerializedName("sessionID") var sessionID: String = UUID.randomUUID().toString(),
     @SerializedName("systemVersion") var systemVersion: String = Build.VERSION.SDK_INT.toString(),
