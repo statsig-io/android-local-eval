@@ -84,7 +84,7 @@ internal class StatsigLogger(
                 "isManualExposure" to isManualExposure.toString(),
             )
             if (evaluationDetails != null) {
-                metadata["reason"] = evaluationDetails.reason.toString()
+                metadata["reason"] = evaluationDetails.reason.reason
                 metadata["time"] = evaluationDetails.configSyncTime.toString()
             }
             val event = LogEvent(
@@ -115,7 +115,7 @@ internal class StatsigLogger(
             val metadata =
                 mutableMapOf("config" to configName, "ruleID" to ruleID, "isManualExposure" to isManualExposure.toString())
             if (evaluationDetails != null) {
-                metadata["reason"] = evaluationDetails.reason.toString()
+                metadata["reason"] = evaluationDetails.reason.reason
                 metadata["time"] = evaluationDetails.configSyncTime.toString()
             }
             val event = LogEvent(
@@ -146,7 +146,7 @@ internal class StatsigLogger(
             val metadata = layerExposureMetadata.toStatsigEventMetadataMap()
             val evaluationDetails = layerExposureMetadata.evaluationDetails
             if (evaluationDetails != null) {
-                metadata["reason"] = evaluationDetails.reason.toString()
+                metadata["reason"] = evaluationDetails.reason.reason
                 metadata["time"] = evaluationDetails.configSyncTime.toString()
             }
             val event = LogEvent(

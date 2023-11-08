@@ -1,5 +1,6 @@
 package com.statsig.androidLocalEvalSDK
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import java.nio.ByteBuffer
 import java.security.MessageDigest
@@ -23,7 +24,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
     }
 
     fun getConfig(user: StatsigUser, configName: String): ConfigEvaluation {
-        // TODO(xinli): implement override
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
@@ -33,8 +33,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
     }
 
     fun getLayer(user: StatsigUser, layerName: String): ConfigEvaluation {
-        // TODO(xinli): implement override
-
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
@@ -223,6 +221,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                 }
 
                 else -> {
+                    Log.d("STATSIG", "Unsupported evaluation conditon: $conditionEnum")
                     return ConfigEvaluation(fetchFromServer = true)
                 }
             }
@@ -534,6 +533,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         hashLookupTable[input] = hash
         return hash
     }
+
     private fun createEvaluationDetails(reason: EvaluationReason): EvaluationDetails {
         if (reason == EvaluationReason.UNINITIALIZED) {
             return EvaluationDetails(0, reason)

@@ -8,7 +8,7 @@ class EvaluationDetails(
 
     fun toMap(): Map<String, String> {
         return mapOf(
-            "reason" to this.reason.toString(),
+            "reason" to this.reason.reason,
             "configSyncTime" to this.configSyncTime.toString(),
             "serverTime" to this.serverTime.toString(),
         )

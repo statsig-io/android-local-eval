@@ -8,6 +8,7 @@ import kotlinx.coroutines.launch
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 
+internal const val SHARED_PREFERENCES_KEY: String = "com.statsig.androidLocalEvalSdk"
 private const val CACHE_BY_SDK_KEY: String = "Statsig.CACHE_BY_KEY"
 
 internal class Store(

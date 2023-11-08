@@ -17,8 +17,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
-private const val SHARED_PREFERENCES_KEY: String = "com.statsig.androidsdk"
-
 class StatsigClient {
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
     private lateinit var options: StatsigOptions
@@ -87,6 +85,9 @@ class StatsigClient {
         callback: IStatsigCallback? = null,
         options: StatsigOptions = StatsigOptions(),
     ) {
+        if (this@StatsigClient.isInitialized()) {
+            return
+        }
         errorBoundary.capture({
             setup(application, sdkKey, options)
             statsigScope.launch {
@@ -121,7 +122,7 @@ class StatsigClient {
             if (option?.disableExposureLogging !== true) {
                 logGateExposureImpl(normalizedUser, gateName, evaluation)
             }
-        }, tag = "checkGate")
+        }, tag = "checkGate", configName = gateName)
         return result
     }
 
@@ -135,7 +136,10 @@ class StatsigClient {
             return
         }
         errorBoundary.capture({
-        }, tag = "logGateExposure")
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.checkGate(normalizedUser, gateName)
+            logGateExposureImpl(normalizedUser, gateName, evaluation, true)
+        }, tag = "logGateExposure", configName = gateName)
     }
 
     /**
@@ -153,11 +157,11 @@ class StatsigClient {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, experimentName)
-            result = getDynamicConfigFromEvalResult(evaluation, normalizedUser, experimentName)
+            result = getDynamicConfigFromEvalResult(evaluation, experimentName)
             if (option?.disableExposureLogging !== true) {
                 logConfigExposureImpl(normalizedUser, experimentName, evaluation)
             }
-        }, tag = "getExperiment")
+        }, tag = "getExperiment", configName = experimentName)
         return result
     }
 
@@ -171,7 +175,7 @@ class StatsigClient {
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, experimentName)
             logConfigExposureImpl(normalizedUser, experimentName, evaluation, true)
-        }, tag = "logExperimentExposure")
+        }, tag = "logExperimentExposure", configName = experimentName)
     }
 
     /**
@@ -191,11 +195,11 @@ class StatsigClient {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
-            result = getDynamicConfigFromEvalResult(evaluation, normalizedUser, dynamicConfigName)
+            result = getDynamicConfigFromEvalResult(evaluation, dynamicConfigName)
             if (option?.disableExposureLogging !== true) {
                 logConfigExposureImpl(normalizedUser, dynamicConfigName, evaluation)
             }
-        }, tag = "getConfig")
+        }, tag = "getConfig", configName = dynamicConfigName)
         return result
     }
 
@@ -212,7 +216,7 @@ class StatsigClient {
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
             logConfigExposureImpl(normalizedUser, dynamicConfigName, evaluation, true)
-        }, tag = "logConfigExposure")
+        }, tag = "logConfigExposure", configName = dynamicConfigName)
     }
 
     /**
@@ -237,7 +241,7 @@ class StatsigClient {
                 evaluation.configDelegate ?: "",
                 onExposure = getExposureFun(option?.disableExposureLogging == true, evaluation, normalizedUser),
             )
-        }, tag = "getLayer")
+        }, tag = "getLayer", configName = layerName)
         return result
     }
 
@@ -263,7 +267,7 @@ class StatsigClient {
             )
             val layerExposureMetadata = createLayerExposureMetadata(layer, paramName, evaluation)
             statsigLogger.logLayerExposure(normalizedUser, layerExposureMetadata)
-        }, tag = "logLayerExposure")
+        }, tag = "logLayerExposure", configName = layerName)
     }
 
     /**
@@ -325,7 +329,7 @@ class StatsigClient {
         this.options = options
         statsigScope = CoroutineScope(statsigJob + dispatcherProvider.main + exceptionHandler)
         sharedPrefs = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-        if (statsigNetwork == null) {
+        if (!this::statsigNetwork.isInitialized) {
             // For testing purpose, prevent mocked network be overwritten
             statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs, errorBoundary)
         }
@@ -452,7 +456,7 @@ class StatsigClient {
         statsigLogger.logGateExposure(user, configName, evaluation.booleanValue, evaluation.ruleID, evaluation.secondaryExposures, isManualExposure, evaluation.evaluationDetails)
     }
 
-    private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, user: StatsigUser, configName: String): DynamicConfig {
+    private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, configName: String): DynamicConfig {
         return DynamicConfig(configName, result.jsonValue as? Map<String, Any> ?: mapOf(), result.ruleID, result.groupName, result.secondaryExposures, result.evaluationDetails)
     }
 }
