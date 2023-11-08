@@ -106,7 +106,7 @@ class DynamicConfig(
      */
     fun getDictionary(key: String, default: Map<String, Any>?): Map<String, Any>? {
         return when (this.value[key]) {
-            is Map<*, *> -> this.value[key] as Map<String, Any>
+            is Map<*, *> -> this.value[key] as? Map<String, Any>
             else -> default
         }
     }

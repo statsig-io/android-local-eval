@@ -19,9 +19,9 @@ internal class ErrorBoundary() {
         this.apiKey = apiKey
     }
 
-    private fun handleException(exception: Throwable, tag: String? = null) {
+    private fun handleException(exception: Throwable, tag: String? = null, configName: String? = null) {
         if (exception !is ExternalException) {
-            this.logException(exception, tag = tag)
+            this.logException(exception, tag = tag, configName = configName)
         }
     }
 
@@ -62,7 +62,7 @@ internal class ErrorBoundary() {
         }
     }
 
-    internal fun logException(exception: Throwable, message: String? = null, tag: String? = null) {
+    internal fun logException(exception: Throwable, message: String? = null, tag: String? = null, configName: String? = null) {
         try {
             Log.e("STATSIG", "An unexpected exception occured: " + exception)
             if (message != null) {
@@ -75,13 +75,17 @@ internal class ErrorBoundary() {
             seen.add(name)
 
             val metadata = statsigMetadata ?: StatsigMetadata("")
-            val body = mapOf(
+            val body = mutableMapOf(
                 "exception" to name,
                 "info" to RuntimeException(exception).stackTraceToString(),
                 "statsigMetadata" to metadata,
-                "functionName" to tag,
-
             )
+            if (tag != null) {
+                body["tag"] = tag
+            }
+            if (configName != null) {
+                body["configName"] = configName
+            }
             val postData = StatsigUtils.getGson().toJson(body)
 
             val conn = URL(urlString).openConnection() as HttpURLConnection
