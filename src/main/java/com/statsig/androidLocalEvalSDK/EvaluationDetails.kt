@@ -22,4 +22,5 @@ enum class EvaluationReason(val reason: String) {
     BOOTSTRAP("Bootstrap"),
     INVALID_BOOTSTRAP("InvalidBootstrap"),
     CACHE("Cache"),
+    UNSUPPORTED("Unsupported"),
 }

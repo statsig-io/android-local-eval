@@ -46,7 +46,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         val unwrappedConfig =
             config
                 ?: return ConfigEvaluation(
-                    fetchFromServer = false,
                     booleanValue = false,
                     mapOf<String, Any>(),
                     evaluationDetails = createEvaluationDetails(EvaluationReason.UNRECOGNIZED),
@@ -55,53 +54,57 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
     }
 
     private fun evaluate(user: StatsigUser, config: APIConfig): ConfigEvaluation {
-        val evaluationDetails = createEvaluationDetails(specStore.initReason)
-        if (!config.enabled) {
-            return ConfigEvaluation(
-                fetchFromServer = false,
-                booleanValue = false,
-                config.defaultValue,
-                "disabled",
-                evaluationDetails = evaluationDetails,
-            )
-        }
-        val secondaryExposures = arrayListOf<Map<String, String>>()
-        for (rule in config.rules) {
-            val result = this.evaluateRule(user, rule)
-            result.evaluationDetails = evaluationDetails
-
-            if (result.fetchFromServer) {
-                return result
-            }
-
-            secondaryExposures.addAll(result.secondaryExposures)
-            if (result.booleanValue) {
-                val delegatedEval = this.evaluateDelegate(user, rule, secondaryExposures)
-                if (delegatedEval != null) {
-                    return delegatedEval
-                }
-                val pass = evaluatePassPercent(user, config, rule)
+        try {
+            val evaluationDetails = createEvaluationDetails(specStore.initReason)
+            if (!config.enabled) {
                 return ConfigEvaluation(
-                    false,
-                    pass,
-                    if (pass) result.jsonValue else config.defaultValue,
-                    result.ruleID,
-                    result.groupName,
-                    secondaryExposures,
+                    booleanValue = false,
+                    config.defaultValue,
+                    "disabled",
                     evaluationDetails = evaluationDetails,
-                    isExperimentGroup = rule.isExperimentGroup ?: false,
                 )
             }
+            val secondaryExposures = arrayListOf<Map<String, String>>()
+            for (rule in config.rules) {
+                val result = this.evaluateRule(user, rule)
+                result.evaluationDetails = evaluationDetails
+                secondaryExposures.addAll(result.secondaryExposures)
+                if (result.booleanValue) {
+                    val delegatedEval = this.evaluateDelegate(user, rule, secondaryExposures)
+                    if (delegatedEval != null) {
+                        return delegatedEval
+                    }
+                    val pass = evaluatePassPercent(user, config, rule)
+                    return ConfigEvaluation(
+                        pass,
+                        if (pass) result.jsonValue else config.defaultValue,
+                        result.ruleID,
+                        result.groupName,
+                        secondaryExposures,
+                        evaluationDetails = evaluationDetails,
+                        isExperimentGroup = rule.isExperimentGroup ?: false,
+                    )
+                }
+            }
+            return ConfigEvaluation(
+                booleanValue = false,
+                config.defaultValue,
+                "default",
+                "",
+                secondaryExposures,
+                evaluationDetails = evaluationDetails,
+            )
+        } catch (e: UnsupportedEvaluationException) {
+            // Return default value for unsupported evaluation
+            errorBoundary.logException(e, e.message)
+            return ConfigEvaluation(
+                booleanValue = false,
+                jsonValue = config.defaultValue,
+                ruleID = "default",
+                explicitParameters = config.explicitParameters ?: arrayOf(),
+                evaluationDetails = EvaluationDetails(configSyncTime = specStore.lcut, reason = EvaluationReason.UNSUPPORTED),
+            )
         }
-        return ConfigEvaluation(
-            fetchFromServer = false,
-            booleanValue = false,
-            config.defaultValue,
-            "default",
-            "",
-            secondaryExposures,
-            evaluationDetails = evaluationDetails,
-        )
     }
 
     private fun evaluateRule(user: StatsigUser, rule: APIRule): ConfigEvaluation {
@@ -109,9 +112,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         var pass = true
         for (condition in rule.conditions) {
             val result = this.evaluateCondition(user, condition)
-            if (result.fetchFromServer) {
-                return result
-            }
             if (!result.booleanValue) {
                 pass = false
             }
@@ -119,7 +119,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         }
 
         return ConfigEvaluation(
-            fetchFromServer = false,
             booleanValue = pass,
             rule.returnValue,
             rule.id,
@@ -139,7 +138,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         secondaryExposures.addAll(delegatedResult.secondaryExposures)
 
         val evaluation = ConfigEvaluation(
-            fetchFromServer = delegatedResult.fetchFromServer,
             booleanValue = delegatedResult.booleanValue,
             jsonValue = delegatedResult.jsonValue,
             ruleID = delegatedResult.ruleID,
@@ -160,13 +158,12 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
             val conditionEnum: ConfigCondition? = try {
                 ConfigCondition.valueOf(condition.type.uppercase())
             } catch (e: java.lang.IllegalArgumentException) {
-                errorBoundary.logException(e, tag = "evaluateCondition:condition")
-                null
+                throw UnsupportedEvaluationException("Unsupported condition: ${condition.type}")
             }
 
             when (conditionEnum) {
                 ConfigCondition.PUBLIC ->
-                    return ConfigEvaluation(fetchFromServer = false, booleanValue = true)
+                    return ConfigEvaluation(booleanValue = true)
 
                 ConfigCondition.FAIL_GATE, ConfigCondition.PASS_GATE -> {
                     val name = StatsigUtils.toStringOrEmpty(condition.targetValue)
@@ -181,7 +178,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     secondaryExposures.addAll(result.secondaryExposures)
                     secondaryExposures.add(newExposure)
                     return ConfigEvaluation(
-                        result.fetchFromServer,
                         if (conditionEnum == ConfigCondition.PASS_GATE) {
                             result.booleanValue
                         } else {
@@ -211,7 +207,8 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                 }
 
                 ConfigCondition.USER_BUCKET -> {
-                    val salt = EvaluatorUtils.getValueAsString(condition.additionalValues?.let { it["salt"] })
+                    val salt =
+                        EvaluatorUtils.getValueAsString(condition.additionalValues?.let { it["salt"] })
                     val unitID = EvaluatorUtils.getUnitID(user, condition.idType) ?: ""
                     value = computeUserHash("$salt.$unitID").mod(1000UL)
                 }
@@ -222,7 +219,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 else -> {
                     Log.d("STATSIG", "Unsupported evaluation conditon: $conditionEnum")
-                    return ConfigEvaluation(fetchFromServer = true)
+                    throw UnsupportedEvaluationException("Unsupported evaluation conditon: $conditionEnum")
                 }
             }
 
@@ -231,10 +228,9 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     val doubleValue = EvaluatorUtils.getValueAsDouble(value)
                     val doubleTargetValue = EvaluatorUtils.getValueAsDouble(condition.targetValue)
                     if (doubleValue == null || doubleTargetValue == null) {
-                        return ConfigEvaluation(fetchFromServer = false, booleanValue = false)
+                        return ConfigEvaluation(booleanValue = false)
                     }
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         doubleValue > doubleTargetValue,
                     )
                 }
@@ -243,10 +239,9 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     val doubleValue = EvaluatorUtils.getValueAsDouble(value)
                     val doubleTargetValue = EvaluatorUtils.getValueAsDouble(condition.targetValue)
                     if (doubleValue == null || doubleTargetValue == null) {
-                        return ConfigEvaluation(fetchFromServer = false, booleanValue = false)
+                        return ConfigEvaluation(booleanValue = false)
                     }
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         doubleValue >= doubleTargetValue,
                     )
                 }
@@ -255,10 +250,10 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     val doubleValue = EvaluatorUtils.getValueAsDouble(value)
                     val doubleTargetValue = EvaluatorUtils.getValueAsDouble(condition.targetValue)
                     if (doubleValue == null || doubleTargetValue == null) {
-                        return ConfigEvaluation(fetchFromServer = false, booleanValue = false)
+                        return ConfigEvaluation(booleanValue = false)
                     }
                     return ConfigEvaluation(
-                        fetchFromServer = false,
+
                         doubleValue < doubleTargetValue,
                     )
                 }
@@ -267,18 +262,20 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     val doubleValue = EvaluatorUtils.getValueAsDouble(value)
                     val doubleTargetValue = EvaluatorUtils.getValueAsDouble(condition.targetValue)
                     if (doubleValue == null || doubleTargetValue == null) {
-                        return ConfigEvaluation(fetchFromServer = false, booleanValue = false)
+                        return ConfigEvaluation(booleanValue = false)
                     }
                     return ConfigEvaluation(
-                        fetchFromServer = false,
+
                         doubleValue <= doubleTargetValue,
                     )
                 }
 
                 "version_gt" -> {
                     return ConfigEvaluation(
-                        false,
-                        versionCompareHelper(value, condition.targetValue) { v1: String, v2: String ->
+                        versionCompareHelper(
+                            value,
+                            condition.targetValue
+                        ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) > 0
                         },
                     )
@@ -286,8 +283,10 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "version_gte" -> {
                     return ConfigEvaluation(
-                        false,
-                        versionCompareHelper(value, condition.targetValue) { v1: String, v2: String ->
+                        versionCompareHelper(
+                            value,
+                            condition.targetValue
+                        ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) >= 0
                         },
                     )
@@ -295,8 +294,10 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "version_lt" -> {
                     return ConfigEvaluation(
-                        false,
-                        versionCompareHelper(value, condition.targetValue) { v1: String, v2: String ->
+                        versionCompareHelper(
+                            value,
+                            condition.targetValue
+                        ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) < 0
                         },
                     )
@@ -304,8 +305,10 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "version_lte" -> {
                     return ConfigEvaluation(
-                        false,
-                        versionCompareHelper(value, condition.targetValue) { v1: String, v2: String ->
+                        versionCompareHelper(
+                            value,
+                            condition.targetValue
+                        ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) <= 0
                         },
                     )
@@ -313,8 +316,10 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "version_eq" -> {
                     return ConfigEvaluation(
-                        false,
-                        versionCompareHelper(value, condition.targetValue) { v1: String, v2: String ->
+                        versionCompareHelper(
+                            value,
+                            condition.targetValue
+                        ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) == 0
                         },
                     )
@@ -322,8 +327,10 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "version_neq" -> {
                     return ConfigEvaluation(
-                        false,
-                        versionCompareHelper(value, condition.targetValue) { v1: String, v2: String ->
+                        versionCompareHelper(
+                            value,
+                            condition.targetValue
+                        ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) != 0
                         },
                     )
@@ -331,7 +338,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "any" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.equals(b, true)
                         },
@@ -340,7 +346,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "none" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         !EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.equals(b, true)
                         },
@@ -349,7 +354,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "any_case_sensitive" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.equals(b, false)
                         },
@@ -358,7 +362,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "none_case_sensitive" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         !EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.equals(b, false)
                         },
@@ -367,7 +370,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "str_starts_with_any" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.startsWith(b, true)
                         },
@@ -376,7 +378,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "str_ends_with_any" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.endsWith(b, true)
                         },
@@ -385,7 +386,6 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "str_contains_any" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.contains(b, true)
                         },
@@ -394,7 +394,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
 
                 "str_contains_none" -> {
                     return ConfigEvaluation(
-                        fetchFromServer = false,
+
                         !EvaluatorUtils.matchStringInArray(value, condition.targetValue) { a, b ->
                             a.contains(b, true)
                         },
@@ -404,29 +404,26 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                 "str_matches" -> {
                     val targetValue = EvaluatorUtils.getValueAsString(condition.targetValue)
                         ?: return ConfigEvaluation(
-                            fetchFromServer = false,
                             booleanValue = false,
                         )
 
                     val strValue =
                         EvaluatorUtils.getValueAsString(value)
                             ?: return ConfigEvaluation(
-                                fetchFromServer = false,
                                 booleanValue = false,
                             )
 
                     return ConfigEvaluation(
-                        fetchFromServer = false,
                         booleanValue = Regex(targetValue).containsMatchIn(strValue),
                     )
                 }
 
                 "eq" -> {
-                    return ConfigEvaluation(fetchFromServer = false, value == condition.targetValue)
+                    return ConfigEvaluation(value == condition.targetValue)
                 }
 
                 "neq" -> {
-                    return ConfigEvaluation(fetchFromServer = false, value != condition.targetValue)
+                    return ConfigEvaluation(value != condition.targetValue)
                 }
 
                 "before" -> {
@@ -455,21 +452,21 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                             calendarOne.time = a
                             calendarTwo.time = b
                             return@compareDates calendarOne[Calendar.YEAR] ==
-                                calendarTwo[Calendar.YEAR] &&
-                                calendarOne[Calendar.DAY_OF_YEAR] ==
-                                calendarTwo[Calendar.DAY_OF_YEAR]
+                                    calendarTwo[Calendar.YEAR] &&
+                                    calendarOne[Calendar.DAY_OF_YEAR] ==
+                                    calendarTwo[Calendar.DAY_OF_YEAR]
                         },
                         value,
                         condition.targetValue,
                     )
                 }
+
                 else -> {
-                    return ConfigEvaluation(fetchFromServer = true)
+                    throw UnsupportedEvaluationException("Unsupported evaluation conditon operator: ${condition.operator}")
                 }
             }
         } catch (e: IllegalArgumentException) {
-            errorBoundary.logException(e, tag = "evaluateCondition:all")
-            return ConfigEvaluation(true)
+            throw UnsupportedEvaluationException("IllegalArgumentException when evaluate conditions")
         }
     }
 
@@ -541,3 +538,5 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         return EvaluationDetails(specStore.lcut, reason)
     }
 }
+
+class UnsupportedEvaluationException(message: String): Exception(message)
