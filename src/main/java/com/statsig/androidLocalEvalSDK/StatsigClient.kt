@@ -187,6 +187,7 @@ class StatsigClient {
      * @param option advanced setup for getConfig, for example disable exposure logging
      * @return DynamicConfig object evaluated for the selected StatsigUser
      */
+    @JvmOverloads
     fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig? {
         if (!isInitialized("getConfig")) {
             return null

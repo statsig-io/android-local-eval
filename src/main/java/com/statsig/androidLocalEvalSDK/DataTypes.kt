@@ -48,24 +48,6 @@ internal data class APICondition(
     @SerializedName("idType") val idType: String,
 )
 
-internal data class APIFeatureGate(
-    @SerializedName("name") val name: String,
-    @SerializedName("value") val value: Boolean,
-    @SerializedName("rule_id") val ruleID: String?,
-    @SerializedName("secondary_exposures")
-    val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
-)
-
-internal data class APIDynamicConfig(
-    @SerializedName("name") val name: String,
-    @SerializedName("value") val value: Map<String, Any>,
-    @SerializedName("rule_id") val ruleID: String? = "",
-    @SerializedName("secondary_exposures")
-    val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
-    @SerializedName("undelegated_secondary_exposures")
-    val undelegatedSecondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
-)
-
 internal data class LayerExposureMetadata(
     @SerializedName("config") val config: String,
     @SerializedName("ruleID") val ruleID: String,

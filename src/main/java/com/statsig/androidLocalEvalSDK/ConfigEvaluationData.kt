@@ -1,7 +1,6 @@
 package com.statsig.androidLocalEvalSDK
 
 internal class ConfigEvaluation(
-    val fetchFromServer: Boolean = false,
     val booleanValue: Boolean = false,
     val jsonValue: Any? = null,
     val ruleID: String = "",

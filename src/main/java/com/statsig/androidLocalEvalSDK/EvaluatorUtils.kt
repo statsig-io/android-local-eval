@@ -144,7 +144,7 @@ internal object EvaluatorUtils {
         b: Any?,
     ): ConfigEvaluation {
         if (a == null || b == null) {
-            return ConfigEvaluation(fetchFromServer = false, booleanValue = false)
+            return ConfigEvaluation(booleanValue = false)
         }
 
         val firstEpoch = getDate(a)
@@ -152,12 +152,12 @@ internal object EvaluatorUtils {
 
         if (firstEpoch == null || secondEpoch == null) {
             return ConfigEvaluation(
-                fetchFromServer = false,
+
                 booleanValue = false,
             )
         }
         return ConfigEvaluation(
-            fetchFromServer = false,
+
             booleanValue = compare(firstEpoch, secondEpoch),
         )
     }
