@@ -149,6 +149,7 @@ class StatsigClient {
      * @param option advanced setup for getExperiment, for example disable exposure logging
      * @return the Dynamic Config backing the experiment
      */
+    @JvmOverloads
     fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig? {
         if (!isInitialized("getExperiment")) {
             return null
@@ -225,6 +226,7 @@ class StatsigClient {
      * @param layerName the name of the Experiment to check
      * @return the current layer values as a Layer object
      */
+    @JvmOverloads
     fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer? {
         if (!isInitialized("getLayer")) {
             return null
