@@ -9,6 +9,7 @@ internal data class APIDownloadedConfigs(
     @SerializedName("layers") val layers: Map<String, Array<String>>?,
     @SerializedName("time") val time: Long = 0,
     @SerializedName("has_updates") val hasUpdates: Boolean,
+    @SerializedName("diagnostics") val diagnostics: Map<String, Int>? = null,
 )
 
 internal data class APIConfig(

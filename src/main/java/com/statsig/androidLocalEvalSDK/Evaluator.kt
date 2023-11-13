@@ -274,7 +274,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     return ConfigEvaluation(
                         versionCompareHelper(
                             value,
-                            condition.targetValue
+                            condition.targetValue,
                         ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) > 0
                         },
@@ -285,7 +285,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     return ConfigEvaluation(
                         versionCompareHelper(
                             value,
-                            condition.targetValue
+                            condition.targetValue,
                         ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) >= 0
                         },
@@ -296,7 +296,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     return ConfigEvaluation(
                         versionCompareHelper(
                             value,
-                            condition.targetValue
+                            condition.targetValue,
                         ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) < 0
                         },
@@ -307,7 +307,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     return ConfigEvaluation(
                         versionCompareHelper(
                             value,
-                            condition.targetValue
+                            condition.targetValue,
                         ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) <= 0
                         },
@@ -318,7 +318,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     return ConfigEvaluation(
                         versionCompareHelper(
                             value,
-                            condition.targetValue
+                            condition.targetValue,
                         ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) == 0
                         },
@@ -329,7 +329,7 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                     return ConfigEvaluation(
                         versionCompareHelper(
                             value,
-                            condition.targetValue
+                            condition.targetValue,
                         ) { v1: String, v2: String ->
                             EvaluatorUtils.versionCompare(v1, v2) != 0
                         },
@@ -452,9 +452,9 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
                             calendarOne.time = a
                             calendarTwo.time = b
                             return@compareDates calendarOne[Calendar.YEAR] ==
-                                    calendarTwo[Calendar.YEAR] &&
-                                    calendarOne[Calendar.DAY_OF_YEAR] ==
-                                    calendarTwo[Calendar.DAY_OF_YEAR]
+                                calendarTwo[Calendar.YEAR] &&
+                                calendarOne[Calendar.DAY_OF_YEAR] ==
+                                calendarTwo[Calendar.DAY_OF_YEAR]
                         },
                         value,
                         condition.targetValue,
@@ -539,4 +539,4 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
     }
 }
 
-class UnsupportedEvaluationException(message: String): Exception(message)
+class UnsupportedEvaluationException(message: String) : Exception(message)

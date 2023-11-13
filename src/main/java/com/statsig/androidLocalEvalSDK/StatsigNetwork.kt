@@ -5,6 +5,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.io.BufferedReader
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.pow
@@ -31,7 +32,7 @@ private val RETRY_CODES: IntArray = intArrayOf(
     524,
     599,
 )
-internal class StatsigNetwork(private val sdkKey: String, private val options: StatsigOptions, private val sharedPrefs: SharedPreferences, private val errorBoundary: ErrorBoundary) {
+internal class StatsigNetwork(private val sdkKey: String, private val options: StatsigOptions, private val sharedPrefs: SharedPreferences, private val diagnostics: Diagnostics) {
     private val dispatcherProvider = CoroutineDispatcherProvider()
     private val gson = StatsigUtils.getGson()
 
@@ -136,6 +137,7 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
             var connection: HttpURLConnection? = null
             try {
                 while (isActive) {
+                    diagnostics.markStart(KeyType.DOWNLOAD_CONFIG_SPECS, StepType.NETWORK_REQUEST, Marker(attempt = retryAttempt))
                     connection = URL(api).openConnection() as HttpURLConnection
                     connection.requestMethod = GET
                     if (timeout != null) {
@@ -149,6 +151,20 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                     } else {
                         connection.errorStream
                     }
+                    var errorMarker = if (code >= HttpURLConnection.HTTP_BAD_REQUEST) {
+                        val errorMessage = inputStream.bufferedReader(Charsets.UTF_8).use(
+                            BufferedReader::readText,
+                        )
+                        Marker.ErrorMessage(errorMessage, code.toString(), null)
+                    } else {
+                        null
+                    }
+                    diagnostics.markEnd(
+                        KeyType.DOWNLOAD_CONFIG_SPECS,
+                        code < HttpURLConnection.HTTP_BAD_REQUEST,
+                        StepType.NETWORK_REQUEST,
+                        Marker(sdkRegion = connection.headerFields["x-statsig-region"]?.get(0), statusCode = code, error = errorMarker, attempt = retryAttempt),
+                    )
 
                     when (code) {
                         in 200..299 -> {
@@ -173,6 +189,15 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                         }
                     }
                 }
+            } catch (e: Exception) {
+                diagnostics.markEnd(
+                    KeyType.DOWNLOAD_CONFIG_SPECS,
+                    false,
+                    StepType.NETWORK_REQUEST,
+                    Marker(error = Marker.ErrorMessage(message = e.message, name = e.javaClass.name), attempt = retryAttempt),
+                )
+                // Leave to ErrorBoundary to handle
+                throw e
             } finally {
                 connection?.disconnect()
             }

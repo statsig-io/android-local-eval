@@ -50,7 +50,7 @@ public class StatsigFromJavaTest {
         assert(experiment.getBoolean("layer_param", false));
         assert(experiment.getBoolean("second_layer_param", false));
         assertEquals("test", experiment.getString("experiment_param", "Default"));
-        assertEquals("test", experiment.getGroupName());
+        assertEquals("Test", experiment.getGroupName());
     }
 
     @Test
