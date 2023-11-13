@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 internal const val CONFIG_EXPOSURE_EVENT = "statsig::config_exposure"
 internal const val LAYER_EXPOSURE_EVENT = "statsig::layer_exposure"
 internal const val GATE_EXPOSURE_EVENT = "statsig::gate_exposure"
+internal const val DIAGNOSTICS_EVENT = "statsig::diagnostics"
 private const val EXPOSURE_DEDUPE_INTERVAL: Long = 10 * 60 * 1000
 internal const val MAX_EVENTS: Int = 50
 internal const val FLUSH_TIMER_MS: Long = 60000
@@ -30,8 +31,10 @@ internal data class StatsigOfflineRequest(
 internal class StatsigLogger(
     private val coroutineScope: CoroutineScope,
     private val network: StatsigNetwork,
+    private val diagnostics: Diagnostics,
     private val statsigMetadata: StatsigMetadata,
 ) {
+    private val gson = StatsigUtils.getGson()
     private var events = ConcurrentLinkedQueue<LogEvent>()
     private val loggedExposures = ConcurrentHashMap<String, Long>()
     private val executor = Executors.newSingleThreadExecutor()
@@ -43,8 +46,9 @@ internal class StatsigLogger(
         }
     }
 
-    internal suspend fun flush() {
+    private suspend fun flush() {
         withContext(singleThreadDispatcher) {
+            addDiagnosticEvents(ContextType.API_CALL)
             if (events.size == 0) {
                 return@withContext
             }
@@ -198,5 +202,31 @@ internal class StatsigLogger(
         }
         loggedExposures[key] = now
         return true
+    }
+
+    suspend fun logDiagnostics(context: ContextType) {
+        if (!diagnostics.shouldLogDiagnostics(context)) {
+            return
+        }
+        val markers = diagnostics.markers[context]
+        if (markers.isNullOrEmpty()) {
+            return
+        }
+        val event = LogEvent(DIAGNOSTICS_EVENT)
+        event.eventMetadata = mapOf("context" to context.toString().lowercase(), "markers" to gson.toJson(markers))
+        log(event)
+    }
+
+    fun addDiagnosticEvents(context: ContextType) {
+        if (!diagnostics.shouldLogDiagnostics(context)) {
+            return
+        }
+        val markers = diagnostics.markers[context]
+        if (markers.isNullOrEmpty()) {
+            return
+        }
+        val event = LogEvent(DIAGNOSTICS_EVENT)
+        event.eventMetadata = mapOf("context" to context.toString().lowercase(), "markers" to gson.toJson(markers))
+        events.add(event)
     }
 }

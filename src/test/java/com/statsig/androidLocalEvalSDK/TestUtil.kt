@@ -3,7 +3,6 @@ package com.statsig.androidLocalEvalSDK
 import android.app.Application
 import android.content.SharedPreferences
 import android.util.Log
-import com.google.common.math.Stats
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import io.mockk.*
@@ -14,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.setMain
-import org.junit.Assert
 import java.lang.Exception
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -187,7 +185,7 @@ class TestUtil {
 
         @JvmName("startStatsigAndWait")
         @JvmOverloads
-        internal fun initializeAndWait(app: Application, network: StatsigNetwork? = null, options: StatsigOptions = StatsigOptions()){
+        internal fun initializeAndWait(app: Application, network: StatsigNetwork? = null, options: StatsigOptions = StatsigOptions()) {
             val countdown = CountDownLatch(1)
             val callback = object : IStatsigCallback {
                 override fun onStatsigInitialize() {

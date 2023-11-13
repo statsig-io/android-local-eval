@@ -17,6 +17,7 @@ internal class Store(
     private var statsigScope: CoroutineScope,
     private val sharedPrefs: SharedPreferences,
     private val errorBoundary: ErrorBoundary,
+    private val diagnostics: Diagnostics,
 ) {
     internal var initReason: EvaluationReason = EvaluationReason.UNINITIALIZED
     internal var lcut: Long = 0
@@ -65,6 +66,7 @@ internal class Store(
     fun bootstrap(initializeValues: String) {
         errorBoundary.capture(
             {
+                diagnostics.markStart(KeyType.BOOTSTRAP)
                 var parsedConfigSpecs: APIDownloadedConfigs? = null
                 initReason = EvaluationReason.INVALID_BOOTSTRAP
                 parsedConfigSpecs = gson.fromJson(initializeValues, APIDownloadedConfigs::class.java)
@@ -72,9 +74,13 @@ internal class Store(
                     setConfigSpecs(parsedConfigSpecs)
                     initReason = EvaluationReason.BOOTSTRAP
                 }
+                diagnostics.markEnd(KeyType.BOOTSTRAP, true)
             },
             tag = "bootstrap",
-            recover = { initReason = EvaluationReason.INVALID_BOOTSTRAP },
+            recover = {
+                initReason = EvaluationReason.INVALID_BOOTSTRAP
+                diagnostics.markEnd(KeyType.BOOTSTRAP, false)
+            },
         )
     }
 
@@ -86,9 +92,11 @@ internal class Store(
                 statusCode = code
             }
             if (downloadedConfigs != null) {
+                diagnostics.markStart(KeyType.DOWNLOAD_CONFIG_SPECS, step = StepType.PROCESS)
                 setConfigSpecs(downloadedConfigs)
                 cacheByKey[sdkKey] = gson.toJson(downloadedConfigs)
                 StatsigUtils.saveStringToSharedPrefs(sharedPrefs, CACHE_BY_SDK_KEY, gson.toJson(cacheByKey))
+                diagnostics.markEnd(KeyType.DOWNLOAD_CONFIG_SPECS, true, step = StepType.PROCESS)
                 initReason = EvaluationReason.NETWORK
                 return@captureAsync InitializationDetails(0L, true, null)
             }
@@ -132,6 +140,9 @@ internal class Store(
         this.layerConfigs = newLayerConfigs
         this.experimentToLayer = newExperimentToLayer
         this.lcut = configSpecs.time
+        if (configSpecs.diagnostics != null) {
+            diagnostics.setSamplingRate(configSpecs.diagnostics)
+        }
     }
 
     private fun getParsedSpecs(values: Array<APIConfig>): Map<String, APIConfig> {
@@ -142,5 +153,14 @@ internal class Store(
             parsed[specName] = value
         }
         return parsed
+    }
+
+    internal fun getEvaluationDetailsForLogging(): Marker.EvaluationDetails {
+        return Marker.EvaluationDetails(
+            initTime = lcut,
+            configSyncTime = lcut,
+            reason = initReason.reason,
+            serverTime = StatsigUtils.getTimeInMillis(),
+        )
     }
 }

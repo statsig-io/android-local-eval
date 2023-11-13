@@ -32,6 +32,7 @@ class StatsigClient {
     private lateinit var statsigScope: CoroutineScope
     private lateinit var specStore: Store
     private lateinit var sharedPrefs: SharedPreferences
+    private lateinit var diagnostics: Diagnostics
 
     private var pollingJob: Job? = null
     private var statsigJob = SupervisorJob()
@@ -332,15 +333,17 @@ class StatsigClient {
         this.options = options
         statsigScope = CoroutineScope(statsigJob + dispatcherProvider.main + exceptionHandler)
         sharedPrefs = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
+        diagnostics = Diagnostics(options.disableDiagnosticsLogging)
         if (!this::statsigNetwork.isInitialized) {
             // For testing purpose, prevent mocked network be overwritten
-            statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs, errorBoundary)
+            statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs, diagnostics)
         }
         statsigMetadata = StatsigMetadata()
-        errorBoundary.setMetadata(statsigMetadata)
         populateStatsigMetadata()
-        statsigLogger = StatsigLogger(statsigScope, statsigNetwork, statsigMetadata)
-        specStore = Store(sdkKey, statsigNetwork, statsigScope, sharedPrefs, errorBoundary)
+        statsigLogger = StatsigLogger(statsigScope, statsigNetwork, diagnostics, statsigMetadata)
+        errorBoundary.setDiagnostics(diagnostics)
+        errorBoundary.setMetadata(statsigMetadata)
+        specStore = Store(sdkKey, statsigNetwork, statsigScope, sharedPrefs, errorBoundary, diagnostics)
         evaluator = Evaluator(specStore, statsigNetwork, options, statsigMetadata, statsigScope, errorBoundary)
         // load cache
         if (!options.loadCacheAsync) {
@@ -359,8 +362,10 @@ class StatsigClient {
         return withContext(dispatcherProvider.io) {
             val initStartTime = StatsigUtils.getTimeInMillis()
             return@withContext errorBoundary.captureAsync({
+                diagnostics.markStart(KeyType.OVERALL)
                 statsigLogger.retryFailedLog(sharedPrefs)
                 if (this@StatsigClient.isBootstrapped.get()) {
+                    diagnostics.markEnd(KeyType.OVERALL, true)
                     return@captureAsync InitializationDetails(System.currentTimeMillis() - initStartTime, true, null)
                 }
                 // load cache
@@ -369,8 +374,11 @@ class StatsigClient {
                 }
                 val initializeDetail = specStore.fetchAndSave()
                 initializeDetail.duration = StatsigUtils.getTimeInMillis() - initStartTime
+                diagnostics.markEnd(KeyType.OVERALL, initializeDetail.success, additionalMarker = Marker(evaluationDetails = specStore.getEvaluationDetailsForLogging()))
+                statsigLogger.logDiagnostics(ContextType.INITIALIZE)
                 return@captureAsync initializeDetail
             }, { e: Exception ->
+                statsigLogger.logDiagnostics(ContextType.INITIALIZE)
                 return@captureAsync InitializationDetails(StatsigUtils.getTimeInMillis() - initStartTime, false, InitializeResponse.FailedInitializeResponse(InitializeFailReason.InternalError, e))
             })
         }

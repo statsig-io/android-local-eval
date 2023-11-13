@@ -14,6 +14,15 @@ internal class ErrorBoundary() {
     private var apiKey: String? = null
     private var seen = HashSet<String>()
     private var statsigMetadata: StatsigMetadata? = null
+    private var diagnostics: Diagnostics? = null
+
+    fun setDiagnostics(diagnostics: Diagnostics) {
+        this.diagnostics = diagnostics
+    }
+
+    fun setMetadata(statsigMetadata: StatsigMetadata) {
+        this.statsigMetadata = statsigMetadata
+    }
 
     fun setKey(apiKey: String) {
         this.apiKey = apiKey
@@ -32,16 +41,16 @@ internal class ErrorBoundary() {
     }
 
     fun capture(task: () -> Unit, tag: String? = null, recover: (() -> Unit)? = null, configName: String? = null) {
+        var markerID = ""
         try {
+            val markerID = startMarker(tag, configName)
             task()
+            endMarker(tag, markerID, true, configName)
         } catch (e: Exception) {
             handleException(e, tag)
+            endMarker(tag, markerID, true, configName)
             recover?.let { it() }
         }
-    }
-
-    fun setMetadata(statsigMetadata: StatsigMetadata) {
-        this.statsigMetadata = statsigMetadata
     }
 
     suspend fun <T> captureAsync(task: suspend () -> T): T? {
@@ -99,5 +108,26 @@ internal class ErrorBoundary() {
             conn.responseCode // triggers request
         } catch (e: Exception) {
         }
+    }
+
+    private fun startMarker(tag: String?, configName: String?): String? {
+        val diagnostics = this.diagnostics
+        val markerKey = KeyType.convertFromString(tag ?: "")
+        if (tag == null || diagnostics == null || markerKey == null) {
+            return null
+        }
+        val markerID = tag + "_" + (diagnostics.markers[ContextType.API_CALL]?.count() ?: 0)
+        diagnostics.diagnosticsContext = ContextType.API_CALL
+        diagnostics.markStart(markerKey, step = null, Marker(markerID = markerID, configName = configName))
+        return markerID
+    }
+
+    private fun endMarker(tag: String?, markerID: String?, success: Boolean, configName: String?) {
+        val diagnostics = this.diagnostics
+        val markerKey = KeyType.convertFromString(tag ?: "")
+        if (tag == null || diagnostics == null || markerKey == null) {
+            return
+        }
+        diagnostics.markEnd(markerKey, success, step = null, Marker(markerID = markerID, configName = configName))
     }
 }
