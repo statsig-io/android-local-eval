@@ -67,9 +67,8 @@ internal class Store(
         errorBoundary.capture(
             {
                 diagnostics.markStart(KeyType.BOOTSTRAP)
-                var parsedConfigSpecs: APIDownloadedConfigs? = null
                 initReason = EvaluationReason.INVALID_BOOTSTRAP
-                parsedConfigSpecs = gson.fromJson(initializeValues, APIDownloadedConfigs::class.java)
+                val parsedConfigSpecs = gson.fromJson(initializeValues, APIDownloadedConfigs::class.java)
                 if (parsedConfigSpecs != null) {
                     setConfigSpecs(parsedConfigSpecs)
                     initReason = EvaluationReason.BOOTSTRAP
