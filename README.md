@@ -1,3 +1,4 @@
+[![](https://jitpack.io/v/statsig-io/android-local-eval.svg)](https://jitpack.io/#statsig-io/android-local-eval)
 # Statsig
 
 ## Statsig Android with Local Evaluation SDK
