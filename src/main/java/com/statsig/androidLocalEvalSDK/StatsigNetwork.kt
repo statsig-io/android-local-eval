@@ -94,7 +94,7 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                     }
                     connection.setRequestProperty(CONTENT_TYPE_HEADER_KEY, CONTENT_TYPE_HEADER_VALUE)
                     connection.setRequestProperty(STATSIG_API_HEADER_KEY, sdkKey)
-                    connection.setRequestProperty(STATSIG_SDK_TYPE_KEY, "android-client")
+                    connection.setRequestProperty(STATSIG_SDK_TYPE_KEY, "android-on-device-evaluations")
                     connection.setRequestProperty(STATSIG_SDK_VERSION_KEY, BuildConfig.VERSION_NAME)
                     connection.setRequestProperty(STATSIG_CLIENT_TIME_HEADER_KEY, System.currentTimeMillis().toString())
                     connection.setRequestProperty(ACCEPT_HEADER_KEY, ACCEPT_HEADER_VALUE)
