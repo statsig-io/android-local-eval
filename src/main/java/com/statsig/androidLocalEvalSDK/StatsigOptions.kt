@@ -38,7 +38,7 @@ class StatsigOptions(
      * network request completes
      * if you always want to wait for the latest values fetched from Statsig server, you should set this to 0 so we do not timeout the network request.
      */
-    @SerializedName("initTimeoutMs") var initTimeoutMs: Int = 3000,
+    @SerializedName("initTimeoutMs") var initTimeoutMs: Int = 6000,
     /**
      * overrides the stableID in the SDK that is set for the user
      */
