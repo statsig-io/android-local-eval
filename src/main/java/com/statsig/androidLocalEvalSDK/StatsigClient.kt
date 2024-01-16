@@ -285,7 +285,7 @@ class StatsigClient {
             return
         }
         errorBoundary.capture({
-            val event = LogEvent(eventName, value, metadata, user)
+            val event = LogEvent(eventName, value, metadata, user, statsigMetadata)
             statsigScope.launch { statsigLogger.log(event) }
         }, tag = "logEvent")
     }
@@ -301,7 +301,7 @@ class StatsigClient {
             return
         }
         errorBoundary.capture({
-            val event = LogEvent(eventName, value, metadata, user)
+            val event = LogEvent(eventName, value, metadata, user, statsigMetadata)
             statsigScope.launch { statsigLogger.log(event) }
         }, tag = "logEvent")
     }
