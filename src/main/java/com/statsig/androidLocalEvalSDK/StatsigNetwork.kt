@@ -32,19 +32,33 @@ private val RETRY_CODES: IntArray = intArrayOf(
     524,
     599,
 )
-internal class StatsigNetwork(private val sdkKey: String, private val options: StatsigOptions, private val sharedPrefs: SharedPreferences, private val diagnostics: Diagnostics) {
+
+internal class StatsigNetwork(
+    private val sdkKey: String,
+    private val options: StatsigOptions,
+    private val sharedPrefs: SharedPreferences,
+    private val diagnostics: Diagnostics
+) {
     private val dispatcherProvider = CoroutineDispatcherProvider()
     private val gson = StatsigUtils.getGson()
 
     suspend fun postLogs(events: List<LogEvent>, statsigMetadata: StatsigMetadata) {
         val requestBody = gson.toJson(mapOf("events" to events, "statsigMetadata" to statsigMetadata))
-        postLogs(requestBody)
+        postLogs(requestBody, mapOf("STATSIG-SESSION-ID" to statsigMetadata.sessionID))
     }
 
-    suspend fun postLogs(requestBody: String) {
+    suspend fun postLogs(
+        requestBody: String,
+        extraHeaders: Map<String, String>? = null
+    ) {
         var code: Int? = null
         try {
-            postRequest(options.eventLoggingAPI, requestBody, 3, callback = { statusCode: Int? -> code = statusCode })
+            postRequest(
+                options.eventLoggingAPI,
+                requestBody,
+                3,
+                extraHeaders = extraHeaders,
+                callback = { statusCode: Int? -> code = statusCode })
             if (code !in 200..299) {
                 addFailedLogRequest(requestBody)
             }
@@ -79,6 +93,7 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
         bodyString: String,
         retries: Int,
         timeout: Int? = null,
+        extraHeaders: Map<String, String>? = null,
         crossinline callback: ((statusCode: Int?) -> Unit) = { _: Int? -> },
     ) {
         return withContext(dispatcherProvider.io) { // Perform network calls in IO thread
@@ -98,6 +113,13 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                     connection.setRequestProperty(STATSIG_SDK_VERSION_KEY, BuildConfig.VERSION_NAME)
                     connection.setRequestProperty(STATSIG_CLIENT_TIME_HEADER_KEY, System.currentTimeMillis().toString())
                     connection.setRequestProperty(ACCEPT_HEADER_KEY, ACCEPT_HEADER_VALUE)
+                    connection.setRequestProperty("Accept-Encoding", "gzip")
+
+                    extraHeaders?.let {
+                        for ((key, value) in it) {
+                            connection.setRequestProperty(key, value)
+                        }
+                    }
 
                     connection.outputStream.bufferedWriter(Charsets.UTF_8)
                         .use { it.write(bodyString) }
@@ -112,6 +134,7 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                                 return@withContext
                             }
                         }
+
                         else -> {
                             callback(code)
                             return@withContext
@@ -137,7 +160,11 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
             var connection: HttpURLConnection? = null
             try {
                 while (isActive) {
-                    diagnostics.markStart(KeyType.DOWNLOAD_CONFIG_SPECS, StepType.NETWORK_REQUEST, Marker(attempt = retryAttempt))
+                    diagnostics.markStart(
+                        KeyType.DOWNLOAD_CONFIG_SPECS,
+                        StepType.NETWORK_REQUEST,
+                        Marker(attempt = retryAttempt)
+                    )
                     connection = URL(api).openConnection() as HttpURLConnection
                     connection.requestMethod = GET
                     if (timeout != null) {
@@ -163,7 +190,12 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                         KeyType.DOWNLOAD_CONFIG_SPECS,
                         code < HttpURLConnection.HTTP_BAD_REQUEST,
                         StepType.NETWORK_REQUEST,
-                        Marker(sdkRegion = connection.headerFields["x-statsig-region"]?.get(0), statusCode = code, error = errorMarker, attempt = retryAttempt),
+                        Marker(
+                            sdkRegion = connection.headerFields["x-statsig-region"]?.get(0),
+                            statusCode = code,
+                            error = errorMarker,
+                            attempt = retryAttempt
+                        ),
                     )
 
                     when (code) {
@@ -174,6 +206,7 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                             return@withContext inputStream.bufferedReader(Charsets.UTF_8)
                                 .use { gson.fromJson(it, T::class.java) }
                         }
+
                         in RETRY_CODES -> {
                             if (retries > 0 && retryAttempt++ < retries) {
                                 // Don't return, just allow the loop to happen
@@ -183,6 +216,7 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                                 return@withContext null
                             }
                         }
+
                         else -> {
                             callback(code)
                             return@withContext null
@@ -194,7 +228,10 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
                     KeyType.DOWNLOAD_CONFIG_SPECS,
                     false,
                     StepType.NETWORK_REQUEST,
-                    Marker(error = Marker.ErrorMessage(message = e.message, name = e.javaClass.name), attempt = retryAttempt),
+                    Marker(
+                        error = Marker.ErrorMessage(message = e.message, name = e.javaClass.name),
+                        attempt = retryAttempt
+                    ),
                 )
                 // Leave to ErrorBoundary to handle
                 throw e
@@ -216,7 +253,10 @@ internal class StatsigNetwork(private val sdkKey: String, private val options: S
     suspend fun addFailedLogRequest(requestBody: String) {
         withContext(dispatcherProvider.io) {
             try {
-                val savedLogs = StatsigUtils.getSavedLogs(sharedPrefs) + StatsigOfflineRequest(System.currentTimeMillis(), requestBody)
+                val savedLogs = StatsigUtils.getSavedLogs(sharedPrefs) + StatsigOfflineRequest(
+                    System.currentTimeMillis(),
+                    requestBody
+                )
                 StatsigUtils.saveStringToSharedPrefs(sharedPrefs, OFFLINE_LOGS_KEY, gson.toJson(savedLogs))
             } catch (_: Exception) {
                 StatsigUtils.removeFromSharedPrefs(sharedPrefs, OFFLINE_LOGS_KEY)
