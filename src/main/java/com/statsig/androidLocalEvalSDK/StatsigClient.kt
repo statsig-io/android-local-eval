@@ -37,6 +37,7 @@ class StatsigClient {
     private var pollingJob: Job? = null
     private var statsigJob = SupervisorJob()
     private var dispatcherProvider = CoroutineDispatcherProvider()
+    private var persistentStorage: StatsigUserPersistenStorageHelper? = null
     private var initialized = AtomicBoolean(false)
     private var isBootstrapped = AtomicBoolean(false)
 
@@ -133,7 +134,7 @@ class StatsigClient {
      * @param gateName the name of the gate to log an exposure for
      */
     fun logGateExposure(user: StatsigUser, gateName: String) {
-        if (!isInitialized("getExperiment")) {
+        if (!isInitialized("logGateExposure")) {
             return
         }
         errorBoundary.capture({
@@ -158,7 +159,7 @@ class StatsigClient {
         var result = DynamicConfig.empty()
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getConfig(normalizedUser, experimentName)
+            val evaluation = evaluator.getConfig(normalizedUser, experimentName, option?.userPersistedValues)
             result = getDynamicConfigFromEvalResult(evaluation, experimentName)
             if (option?.disableExposureLogging !== true) {
                 logConfigExposureImpl(normalizedUser, experimentName, evaluation)
@@ -274,6 +275,30 @@ class StatsigClient {
         }, tag = "logLayerExposure", configName = layerName)
     }
 
+    /*
+     * Load persisted values for given user and idType used for evaluation asynchronously,
+     * callback will be called when value is ready
+     * */
+    fun loadUserPersistedValuesAsync(user: StatsigUser, idType: String, callback: IPersistentStorageCallback) {
+        errorBoundary.capture(
+            task = {
+                return@capture this.persistentStorage?.loadAsync(user, idType, callback)
+            },
+            tag = "loadUserPersistedValuesAsync",
+        )
+    }
+
+    /*
+     * Load persisted values for given user and idType used for evaluation
+     * */
+    suspend fun loadUserPersistedValues(user: StatsigUser, idType: String): PersistedValues {
+        return errorBoundary.captureAsync(
+            task = {
+                return@captureAsync this.persistentStorage?.load(user, idType) ?: mapOf()
+            },
+        ) ?: mapOf()
+    }
+
     /**
      * Log an event to Statsig for the current user
      * @param eventName the name of the event to track
@@ -340,11 +365,14 @@ class StatsigClient {
         }
         statsigMetadata = StatsigMetadata()
         populateStatsigMetadata()
+        val persistentStorageProvider = options.userPersistentStorage
+        persistentStorage = if (persistentStorageProvider != null) StatsigUserPersistenStorageHelper(persistentStorageProvider, statsigScope) else null
         statsigLogger = StatsigLogger(statsigScope, statsigNetwork, diagnostics, statsigMetadata)
         errorBoundary.setDiagnostics(diagnostics)
         errorBoundary.setMetadata(statsigMetadata)
         specStore = Store(sdkKey, statsigNetwork, statsigScope, sharedPrefs, errorBoundary, diagnostics)
-        evaluator = Evaluator(specStore, statsigNetwork, options, statsigMetadata, statsigScope, errorBoundary)
+        evaluator = Evaluator(specStore, errorBoundary, persistentStorage)
+
         // load cache
         if (!options.loadCacheAsync) {
             specStore.syncLoadFromLocalStorage()

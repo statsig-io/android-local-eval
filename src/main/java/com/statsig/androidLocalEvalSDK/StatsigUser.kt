@@ -1,5 +1,6 @@
 package com.statsig.androidLocalEvalSDK
 
+import android.util.Log
 import com.google.gson.annotations.SerializedName
 
 private const val STATSIG_NULL_USER: String = "Statsig.NULL_USER"
@@ -95,5 +96,20 @@ data class StatsigUser(
         }
 
         return id
+    }
+
+    internal fun getID(type: String): String? {
+        val idTypeLowerCase = type.lowercase()
+        if (idTypeLowerCase == "userid") {
+            return userID
+        } else {
+            customIDs?.forEach {
+                if (it.key.lowercase() == idTypeLowerCase) {
+                    return it.value
+                }
+            }
+        }
+        Log.w("Statsig", "Cannot find given unit type $type")
+        return null
     }
 }

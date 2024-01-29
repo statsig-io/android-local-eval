@@ -34,6 +34,8 @@
       "enabled": true,
       "defaultValue": { "experiment_param": "control" },
       "entity": "experiment",
+      "idType": "userid",
+      "isActive": true,
       "rules": [
         {
           "name": "",

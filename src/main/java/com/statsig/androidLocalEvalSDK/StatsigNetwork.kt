@@ -37,7 +37,7 @@ internal class StatsigNetwork(
     private val sdkKey: String,
     private val options: StatsigOptions,
     private val sharedPrefs: SharedPreferences,
-    private val diagnostics: Diagnostics
+    private val diagnostics: Diagnostics,
 ) {
     private val dispatcherProvider = CoroutineDispatcherProvider()
     private val gson = StatsigUtils.getGson()
@@ -49,7 +49,7 @@ internal class StatsigNetwork(
 
     suspend fun postLogs(
         requestBody: String,
-        extraHeaders: Map<String, String>? = null
+        extraHeaders: Map<String, String>? = null,
     ) {
         var code: Int? = null
         try {
@@ -58,7 +58,8 @@ internal class StatsigNetwork(
                 requestBody,
                 3,
                 extraHeaders = extraHeaders,
-                callback = { statusCode: Int? -> code = statusCode })
+                callback = { statusCode: Int? -> code = statusCode },
+            )
             if (code !in 200..299) {
                 addFailedLogRequest(requestBody)
             }
@@ -163,7 +164,7 @@ internal class StatsigNetwork(
                     diagnostics.markStart(
                         KeyType.DOWNLOAD_CONFIG_SPECS,
                         StepType.NETWORK_REQUEST,
-                        Marker(attempt = retryAttempt)
+                        Marker(attempt = retryAttempt),
                     )
                     connection = URL(api).openConnection() as HttpURLConnection
                     connection.requestMethod = GET
@@ -194,7 +195,7 @@ internal class StatsigNetwork(
                             sdkRegion = connection.headerFields["x-statsig-region"]?.get(0),
                             statusCode = code,
                             error = errorMarker,
-                            attempt = retryAttempt
+                            attempt = retryAttempt,
                         ),
                     )
 
@@ -230,7 +231,7 @@ internal class StatsigNetwork(
                     StepType.NETWORK_REQUEST,
                     Marker(
                         error = Marker.ErrorMessage(message = e.message, name = e.javaClass.name),
-                        attempt = retryAttempt
+                        attempt = retryAttempt,
                     ),
                 )
                 // Leave to ErrorBoundary to handle
@@ -255,7 +256,7 @@ internal class StatsigNetwork(
             try {
                 val savedLogs = StatsigUtils.getSavedLogs(sharedPrefs) + StatsigOfflineRequest(
                     System.currentTimeMillis(),
-                    requestBody
+                    requestBody,
                 )
                 StatsigUtils.saveStringToSharedPrefs(sharedPrefs, OFFLINE_LOGS_KEY, gson.toJson(savedLogs))
             } catch (_: Exception) {

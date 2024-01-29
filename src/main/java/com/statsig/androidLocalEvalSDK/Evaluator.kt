@@ -1,17 +1,16 @@
 package com.statsig.androidLocalEvalSDK
 
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.util.Calendar
 import java.util.Date
 
-internal class Evaluator(private val specStore: Store, private val network: StatsigNetwork, private val options: StatsigOptions, private val statsigMetadata: StatsigMetadata, private val statsigScope: CoroutineScope, private val errorBoundary: ErrorBoundary) {
+internal class Evaluator(private val specStore: Store, private val errorBoundary: ErrorBoundary, private val persistentStorage: StatsigUserPersistenStorageHelper?) {
     private val calendarOne = Calendar.getInstance()
     private val calendarTwo = Calendar.getInstance()
     private var hashLookupTable: MutableMap<String, ULong> = HashMap()
-
+    private val gson = StatsigUtils.getGson()
     fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
@@ -23,13 +22,30 @@ internal class Evaluator(private val specStore: Store, private val network: Stat
         return this.evaluateConfig(user, evalGate)
     }
 
-    fun getConfig(user: StatsigUser, configName: String): ConfigEvaluation {
+    fun getConfig(user: StatsigUser, configName: String, persistedValues: PersistedValues? = null): ConfigEvaluation {
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
             )
         }
-        return evaluateConfig(user, specStore.getConfig(configName))
+        val config = specStore.getConfig(configName)
+        if (config == null) {
+            // Delegate to evaluateConfig to construct the evaluation
+            return evaluateConfig(user, config)
+        }
+        if (config.isActive && persistedValues != null) {
+            val stickyValue = persistedValues?.get(configName)
+            if (stickyValue != null) {
+                // return sticky value
+                return gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
+            }
+            val evaluation = evaluateConfig(user, config)
+            persistentStorage?.save(user, config.idType, configName, gson.toJson(evaluation.toPersistedValueConfig()))
+            return evaluation
+        } else {
+            persistentStorage?.delete(user, config.idType, configName)
+            return evaluateConfig(user, config)
+        }
     }
 
     fun getLayer(user: StatsigUser, layerName: String): ConfigEvaluation {

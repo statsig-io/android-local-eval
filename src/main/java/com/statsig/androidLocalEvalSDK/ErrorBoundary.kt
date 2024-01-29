@@ -40,12 +40,13 @@ internal class ErrorBoundary() {
         }
     }
 
-    fun capture(task: () -> Unit, tag: String? = null, recover: (() -> Unit)? = null, configName: String? = null) {
+    fun <T> capture(task: () -> T, tag: String? = null, recover: (() -> T)? = null, configName: String? = null): T? {
         var markerID = ""
-        try {
+        return try {
             val markerID = startMarker(tag, configName)
-            task()
+            val result = task()
             endMarker(tag, markerID, true, configName)
+            result
         } catch (e: Exception) {
             handleException(e, tag)
             endMarker(tag, markerID, true, configName)
@@ -62,11 +63,11 @@ internal class ErrorBoundary() {
         }
     }
 
-    suspend fun <T> captureAsync(task: suspend () -> T, recover: (suspend (e: Exception) -> T)): T {
+    suspend fun <T> captureAsync(task: suspend () -> T, recover: (suspend (e: Exception) -> T), tag: String? = null): T {
         return try {
             task()
         } catch (e: Exception) {
-            handleException(e)
+            handleException(e, tag = tag)
             recover(e)
         }
     }
