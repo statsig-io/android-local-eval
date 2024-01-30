@@ -53,7 +53,6 @@ class StatsigClient {
      * Susequent calls to initialize will be ignored.  To switch the user or update user values,
      * use updateUser()
      */
-    @JvmOverloads
     suspend fun initialize(
         application: Application,
         sdkKey: String,
