@@ -3,7 +3,6 @@ package com.statsig.androidLocalEvalSDK
 import android.app.Application
 import android.content.SharedPreferences
 import android.util.Log
-import com.google.common.math.Stats
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import io.mockk.*
@@ -14,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.setMain
-import org.junit.Assert
 import java.lang.Exception
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -154,7 +152,7 @@ class TestUtil {
             }
 
             coEvery {
-                statsigNetwork.postLogs(any(), any())
+                statsigNetwork.postLogs(any<String>(), any())
             } coAnswers {
                 throw Exception()
             }
@@ -179,7 +177,7 @@ class TestUtil {
             }
 
             coEvery {
-                statsigNetwork.postLogs(any(), any())
+                statsigNetwork.postLogs(any<String>(), any())
             } returns Unit
 
             return statsigNetwork

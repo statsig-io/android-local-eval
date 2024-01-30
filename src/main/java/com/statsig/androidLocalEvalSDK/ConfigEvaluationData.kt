@@ -1,5 +1,7 @@
 package com.statsig.androidLocalEvalSDK
 
+import com.google.gson.annotations.SerializedName
+
 internal class ConfigEvaluation(
     val booleanValue: Boolean = false,
     val jsonValue: Any? = null,
@@ -12,6 +14,42 @@ internal class ConfigEvaluation(
     var isExperimentGroup: Boolean = false,
 ) {
     var undelegatedSecondaryExposures: ArrayList<Map<String, String>> = secondaryExposures
+
+    // Used to save to PersistentStorage
+    fun toPersistedValueConfig(): PersistedValueConfig {
+        return PersistedValueConfig(
+            value = this.booleanValue,
+            jsonValue = this.jsonValue,
+            ruleID = this.ruleID,
+            groupName = this.groupName,
+            secondaryExposures = this.secondaryExposures,
+            isExperimentGroup = this.isExperimentGroup,
+            time = this.evaluationDetails?.configSyncTime,
+        )
+    }
+}
+
+internal class PersistedValueConfig(
+    @SerializedName("value") val value: Boolean = false,
+    @SerializedName("json_value") val jsonValue: Any? = null,
+    @SerializedName("rule_id") val ruleID: String = "",
+    @SerializedName("group_name") val groupName: String? = null,
+    @SerializedName("secondary_exposures") val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
+    @SerializedName("time") var time: Long? = null,
+    @SerializedName("is_experiment_group") var isExperimentGroup: Boolean = false,
+) {
+    fun toConfigEvaluationData(): ConfigEvaluation {
+        val evalDetail = EvaluationDetails(this.time ?: StatsigUtils.getTimeInMillis(), EvaluationReason.PERSISTED)
+        return ConfigEvaluation(
+            jsonValue = this.jsonValue,
+            booleanValue = this.value,
+            ruleID = this.ruleID,
+            groupName = this.groupName,
+            secondaryExposures = this.secondaryExposures,
+            isExperimentGroup = this.isExperimentGroup,
+            evaluationDetails = evalDetail,
+        )
+    }
 }
 
 internal enum class ConfigCondition {

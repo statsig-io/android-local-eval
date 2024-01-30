@@ -57,6 +57,11 @@ class StatsigOptions(
      * Prevent the SDK from sending useful debug information to Statsig
      */
     @SerializedName("disableDiagnosticsLogging") var disableDiagnosticsLogging: Boolean = false,
+    /**
+     * Use if you want to ensure a user's variant stays the same while an experiment running.
+     * Interface to load/save/delete configs
+     */
+    @SerializedName("userPersistentStorageProvider") var userPersistentStorage: UserPersistentStorageInterface? = null,
 ) {
 
     private var environment: MutableMap<String, String>? = null
@@ -92,7 +97,18 @@ class StatsigOptions(
     }
 }
 
+interface UserPersistentStorageInterface {
+    suspend fun load(key: String): PersistedValues
+    fun save(key: String, experimentName: String, data: String)
+    fun delete(key: String, experiment: String)
+    fun loadAsync(key: String, callback: IPersistentStorageCallback)
+}
+
+interface IPersistentStorageCallback {
+    fun onLoaded(values: PersistedValues)
+}
+
 data class CheckGateOptions(var disableExposureLogging: Boolean = false)
 data class GetConfigOptions(var disableExposureLogging: Boolean = false)
 data class GetLayerOptions(var disableExposureLogging: Boolean = false)
-data class GetExperimentOptions(var disableExposureLogging: Boolean = false)
+data class GetExperimentOptions(var disableExposureLogging: Boolean = false, var userPersistedValues: PersistedValues? = null)
