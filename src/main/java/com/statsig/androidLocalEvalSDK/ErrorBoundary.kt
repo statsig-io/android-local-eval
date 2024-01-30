@@ -3,10 +3,12 @@ package com.statsig.androidLocalEvalSDK
 import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import java.io.DataOutputStream
+import java.lang.Math.floor
 import java.net.HttpURLConnection
 import java.net.URL
 
 internal class ExternalException(message: String? = null) : Exception(message)
+const val SAMPLING_RATE = 10_000 // Sample rate 0.01%
 
 internal class ErrorBoundary() {
     internal var urlString = "https://statsigapi.net/v1/sdk_exception"
@@ -17,7 +19,10 @@ internal class ErrorBoundary() {
     private var diagnostics: Diagnostics? = null
 
     fun setDiagnostics(diagnostics: Diagnostics) {
-        this.diagnostics = diagnostics
+        val sampled = floor(Math.random() * SAMPLING_RATE) == 0.0
+        if (sampled) {
+            this.diagnostics = diagnostics
+        }
     }
 
     fun setMetadata(statsigMetadata: StatsigMetadata) {

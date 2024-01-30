@@ -205,10 +205,8 @@ internal class StatsigLogger(
     }
 
     suspend fun logDiagnostics(context: ContextType) {
-        if (!diagnostics.shouldLogDiagnostics(context)) {
-            return
-        }
         val markers = diagnostics.markers[context]
+        diagnostics.clearContext(context)
         if (markers.isNullOrEmpty()) {
             return
         }
@@ -218,13 +216,12 @@ internal class StatsigLogger(
     }
 
     fun addDiagnosticEvents(context: ContextType) {
-        if (!diagnostics.shouldLogDiagnostics(context)) {
-            return
-        }
         val markers = diagnostics.markers[context]
+        diagnostics.clearContext(context)
         if (markers.isNullOrEmpty()) {
             return
         }
+
         val event = LogEvent(DIAGNOSTICS_EVENT)
         event.eventMetadata = mapOf("context" to context.toString().lowercase(), "markers" to gson.toJson(markers))
         events.add(event)

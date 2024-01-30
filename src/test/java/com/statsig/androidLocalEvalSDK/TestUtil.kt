@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
+import com.google.gson.reflect.TypeToken
 import io.mockk.*
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -164,6 +165,7 @@ class TestUtil {
         @JvmName("mockNetwork")
         internal fun mockNetwork(
             configSpecs: APIDownloadedConfigs? = null,
+            onLog: ((events: List<LogEvent>) -> Unit)? = null,
         ): StatsigNetwork {
             val statsigNetwork = mockk<StatsigNetwork>()
             var dcs: APIDownloadedConfigs? = configSpecs
@@ -178,7 +180,17 @@ class TestUtil {
 
             coEvery {
                 statsigNetwork.postLogs(any<String>(), any())
-            } returns Unit
+            } coAnswers {
+                val type = object : TypeToken<List<LogEvent>>() {}.type
+                val events = StatsigUtils.getGson().fromJson<List<LogEvent>>(firstArg<String>(), type)
+                onLog?.invoke(events)
+            }
+
+            coEvery {
+                statsigNetwork.postLogs(any<List<LogEvent>>(), any())
+            } coAnswers {
+                onLog?.invoke(firstArg())
+            }
 
             return statsigNetwork
         }
