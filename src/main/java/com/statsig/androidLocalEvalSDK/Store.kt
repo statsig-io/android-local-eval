@@ -139,9 +139,6 @@ internal class Store(
         this.layerConfigs = newLayerConfigs
         this.experimentToLayer = newExperimentToLayer
         this.lcut = configSpecs.time
-        if (configSpecs.diagnostics != null) {
-            diagnostics.setSamplingRate(configSpecs.diagnostics)
-        }
     }
 
     private fun getParsedSpecs(values: Array<APIConfig>): Map<String, APIConfig> {
