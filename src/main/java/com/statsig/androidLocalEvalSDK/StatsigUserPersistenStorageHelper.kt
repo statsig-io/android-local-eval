@@ -17,9 +17,7 @@ class StatsigUserPersistenStorageHelper(private val provider: UserPersistentStor
         val key = getStorageKey(user, idType)
         val callback = object : IPersistentStorageCallback {
             override fun onLoaded(values: PersistedValues) {
-                if (values[experiment] != null) {
-                    provider.delete(key, experiment)
-                }
+                provider.delete(key, experiment)
             }
         }
         provider.loadAsync(key, callback)
