@@ -20,8 +20,14 @@ jobs:
               repo: context.repo.repo,
               ref: 'main',
             }
+            // Kong
+            github.rest.actions.createWorkflowDispatch({
+              ...args,
+              workflow_id: 'kong.yml'
+            })
+            
             // Tests
             github.rest.actions.createWorkflowDispatch({
               ...args,
-              workflow_id: 'tests.yml'
+              workflow_id: 'test.yml'
             })
