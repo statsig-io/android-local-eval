@@ -8,7 +8,7 @@ A slimmed version of the Android that operates on the rule definitions to evalua
 Statsig helps you move faster with feature gates (feature flags), and/or dynamic configs. It also allows you to run A/B/n tests to validate your new features and understand their impact on your KPIs. If you're new to Statsig, check out our product and create an account at [statsig.com](https://www.statsig.com).
 
 ## Getting Started
-Check out our [SDK docs](https://docs.statsig.com/client/jsLocalEvaluationSDK) to get started.
+Check out our [SDK docs](https://docs.statsig.com/client/androidOnDeviceEvaluationSDK) to get started.
 
 ## Supported Features
 - Gate Checks
