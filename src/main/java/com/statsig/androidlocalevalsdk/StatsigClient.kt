@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.annotation.VisibleForTesting
+import com.statsig.androidsdk.StatsigNetworkConnectivityListener
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -360,7 +361,7 @@ class StatsigClient {
         diagnostics = Diagnostics(options.disableDiagnosticsLogging)
         if (!this::statsigNetwork.isInitialized) {
             // For testing purpose, prevent mocked network be overwritten
-            statsigNetwork = StatsigNetwork(sdkKey, options, sharedPrefs, diagnostics)
+            statsigNetwork = StatsigNetwork(application,sdkKey, options, sharedPrefs, diagnostics)
         }
         statsigMetadata = StatsigMetadata()
         populateStatsigMetadata()
