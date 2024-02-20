@@ -50,6 +50,7 @@ internal class Diagnostics(private var isDisabled: Boolean) {
             StepType.NETWORK_REQUEST -> {
                 marker.attempt = additionalMarker?.attempt
                 marker.isDelta = additionalMarker?.isDelta
+                marker.hasNetwork = additionalMarker?.hasNetwork
             }
         }
         this.addMarker(marker)

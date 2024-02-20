@@ -1,7 +1,10 @@
 package com.statsig.androidlocalevalsdk
 
 import android.app.Application
+import android.content.Context
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.NetworkInfo
 import android.util.Log
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
@@ -79,6 +82,8 @@ class TestUtil {
                 app.registerActivityLifecycleCallbacks(any())
             } returns Unit
 
+            mockNetworkConnectivityService(app)
+
             // Mock Log
             mockkStatic(Log::class)
             every { Log.v(any(), any()) } answers {
@@ -98,6 +103,23 @@ class TestUtil {
                 0
             }
             return sharedPrefs
+        }
+
+        private fun mockNetworkConnectivityService(application: Application) {
+            val connectivityManager: ConnectivityManager = mockk()
+
+            val info: NetworkInfo = mockk()
+            every {
+                connectivityManager.activeNetworkInfo
+            } returns info
+
+            every {
+                info.isConnectedOrConnecting
+            } returns true
+
+            every {
+                application.getSystemService(Context.CONNECTIVITY_SERVICE)
+            } returns connectivityManager
         }
 
         fun mockStatsigUtils() {

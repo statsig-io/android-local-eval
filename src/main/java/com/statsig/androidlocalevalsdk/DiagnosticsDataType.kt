@@ -17,6 +17,7 @@ data class Marker(
     @SerializedName("configName") var configName: String? = null,
     @SerializedName("attempt") var attempt: Int? = null,
     @SerializedName("isDelta") var isDelta: Boolean? = null,
+    @SerializedName("hasNetwork") var hasNetwork: Boolean? = null,
     @SerializedName("evaluationDetails") var evaluationDetails: EvaluationDetails? = null,
 ) {
     data class ErrorMessage(

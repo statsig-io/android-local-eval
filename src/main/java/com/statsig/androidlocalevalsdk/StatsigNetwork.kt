@@ -1,6 +1,8 @@
 package com.statsig.androidlocalevalsdk
 
+import android.content.Context
 import android.content.SharedPreferences
+import com.statsig.androidsdk.StatsigNetworkConnectivityListener
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -34,6 +36,7 @@ private val RETRY_CODES: IntArray = intArrayOf(
 )
 
 internal class StatsigNetwork(
+    private val context: Context,
     private val sdkKey: String,
     private val options: StatsigOptions,
     private val sharedPrefs: SharedPreferences,
@@ -41,6 +44,7 @@ internal class StatsigNetwork(
 ) {
     private val dispatcherProvider = CoroutineDispatcherProvider()
     private val gson = StatsigUtils.getGson()
+    private val connectivityListener = StatsigNetworkConnectivityListener(context)
 
     suspend fun postLogs(events: List<LogEvent>, statsigMetadata: StatsigMetadata) {
         val requestBody = gson.toJson(mapOf("events" to events, "statsigMetadata" to statsigMetadata))
@@ -196,6 +200,7 @@ internal class StatsigNetwork(
                             statusCode = code,
                             error = errorMarker,
                             attempt = retryAttempt,
+                            hasNetwork = connectivityListener.isNetworkAvailable()
                         ),
                     )
 
@@ -232,6 +237,7 @@ internal class StatsigNetwork(
                     Marker(
                         error = Marker.ErrorMessage(message = e.message, name = e.javaClass.name),
                         attempt = retryAttempt,
+                        hasNetwork = connectivityListener.isNetworkAvailable()
                     ),
                 )
                 // Leave to ErrorBoundary to handle
