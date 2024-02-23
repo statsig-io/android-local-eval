@@ -210,6 +210,10 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
                     value = EvaluatorUtils.getFromUser(user, field)
                 }
 
+                ConfigCondition.UA_BASED -> {
+                    value = EvaluatorUtils.getFromUser(user, field)
+                }
+
                 ConfigCondition.USER_FIELD -> {
                     value = EvaluatorUtils.getFromUser(user, field)
                 }
