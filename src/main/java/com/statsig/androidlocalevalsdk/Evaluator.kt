@@ -106,7 +106,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
                 booleanValue = false,
                 config.defaultValue,
                 "default",
-                "",
+                null,
                 secondaryExposures,
                 evaluationDetails = evaluationDetails,
             )
