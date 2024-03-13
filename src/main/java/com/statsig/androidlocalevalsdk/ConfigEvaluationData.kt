@@ -23,7 +23,6 @@ internal class ConfigEvaluation(
             ruleID = this.ruleID,
             groupName = this.groupName,
             secondaryExposures = this.secondaryExposures,
-            isExperimentGroup = this.isExperimentGroup,
             time = this.evaluationDetails?.configSyncTime,
         )
     }
@@ -36,7 +35,6 @@ internal class PersistedValueConfig(
     @SerializedName("group_name") val groupName: String? = null,
     @SerializedName("secondary_exposures") val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
     @SerializedName("time") var time: Long? = null,
-    @SerializedName("is_experiment_group") var isExperimentGroup: Boolean = false,
 ) {
     fun toConfigEvaluationData(): ConfigEvaluation {
         val evalDetail = EvaluationDetails(this.time ?: StatsigUtils.getTimeInMillis(), EvaluationReason.PERSISTED)
@@ -46,7 +44,7 @@ internal class PersistedValueConfig(
             ruleID = this.ruleID,
             groupName = this.groupName,
             secondaryExposures = this.secondaryExposures,
-            isExperimentGroup = this.isExperimentGroup,
+            isExperimentGroup = true,
             evaluationDetails = evalDetail,
         )
     }
