@@ -157,7 +157,8 @@
             "second_layer_param": false
           },
           "id": "2RamGsERWbWMIMnSfOlQuX",
-          "salt": "2RamGsERWbWMIMnSfOlQuX"
+          "salt": "2RamGsERWbWMIMnSfOlQuX",
+          "isExperimentGroup": true
         },
         {
           "name": "2RamGujUou6h2bVNQWhtNZ",
@@ -180,7 +181,8 @@
             "second_layer_param": true
           },
           "id": "2RamGujUou6h2bVNQWhtNZ",
-          "salt": "2RamGujUou6h2bVNQWhtNZ"
+          "salt": "2RamGujUou6h2bVNQWhtNZ",
+          "isExperimentGroup": true
         }
       ]
     }

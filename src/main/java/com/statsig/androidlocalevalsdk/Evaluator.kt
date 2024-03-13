@@ -40,7 +40,9 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
                 return gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
             }
             val evaluation = evaluateConfig(user, config)
-            persistentStorage?.save(user, config.idType, configName, gson.toJson(evaluation.toPersistedValueConfig()))
+            if (evaluation.isExperimentGroup) {
+                persistentStorage?.save(user, config.idType, configName, gson.toJson(evaluation.toPersistedValueConfig()))
+            }
             return evaluation
         } else {
             persistentStorage?.delete(user, config.idType, configName)
