@@ -8,7 +8,7 @@ internal class ConfigEvaluation(
     val ruleID: String = "",
     val groupName: String? = null,
     val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
-    val explicitParameters: Array<String> = arrayOf(),
+    val explicitParameters: Array<String>? = null,
     val configDelegate: String? = null,
     var evaluationDetails: EvaluationDetails? = null,
     var isExperimentGroup: Boolean = false,
@@ -23,6 +23,9 @@ internal class ConfigEvaluation(
             ruleID = this.ruleID,
             groupName = this.groupName,
             secondaryExposures = this.secondaryExposures,
+            explicitParameters = this.explicitParameters,
+            configDelegate = this.configDelegate,
+            undelegatedSecondaryExposures = this.undelegatedSecondaryExposures,
             time = this.evaluationDetails?.configSyncTime,
         )
     }
@@ -34,19 +37,26 @@ internal class PersistedValueConfig(
     @SerializedName("rule_id") val ruleID: String = "",
     @SerializedName("group_name") val groupName: String? = null,
     @SerializedName("secondary_exposures") val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
+    @SerializedName("explicit_parameters") val explicitParameters: Array<String>? = null,
+    @SerializedName("config_delegate") val configDelegate: String? = null,
+    @SerializedName("undelegated_secondary_exposures") val undelegatedSecondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
     @SerializedName("time") var time: Long? = null,
 ) {
     fun toConfigEvaluationData(): ConfigEvaluation {
         val evalDetail = EvaluationDetails(this.time ?: StatsigUtils.getTimeInMillis(), EvaluationReason.PERSISTED)
-        return ConfigEvaluation(
+        var evaluation = ConfigEvaluation(
             jsonValue = this.jsonValue,
             booleanValue = this.value,
             ruleID = this.ruleID,
             groupName = this.groupName,
             secondaryExposures = this.secondaryExposures,
+            explicitParameters = this.explicitParameters,
+            configDelegate = this.configDelegate,
             isExperimentGroup = true,
             evaluationDetails = evalDetail,
         )
+        evaluation.undelegatedSecondaryExposures = this.undelegatedSecondaryExposures
+        return evaluation
     }
 }
 

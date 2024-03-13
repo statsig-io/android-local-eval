@@ -8,16 +8,16 @@ class StatsigUserPersistenStorageHelper(private val provider: UserPersistentStor
         return provider.load(key)
     }
 
-    fun save(user: StatsigUser, idType: String, experimentName: String, data: String) {
+    fun save(user: StatsigUser, idType: String, name: String, data: String) {
         val key = getStorageKey(user, idType)
-        provider.save(key, experimentName, data)
+        provider.save(key, name, data)
     }
 
-    fun delete(user: StatsigUser, idType: String, experiment: String) {
+    fun delete(user: StatsigUser, idType: String, name: String) {
         val key = getStorageKey(user, idType)
         val callback = object : IPersistentStorageCallback {
             override fun onLoaded(values: PersistedValues) {
-                provider.delete(key, experiment)
+                provider.delete(key, name)
             }
         }
         provider.loadAsync(key, callback)

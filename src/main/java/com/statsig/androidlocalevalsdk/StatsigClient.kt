@@ -236,7 +236,7 @@ class StatsigClient {
         var result = Layer.empty(layerName)
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getLayer(normalizedUser, layerName)
+            val evaluation = evaluator.getLayer(normalizedUser, layerName, option?.userPersistedValues)
             result = Layer(
                 layerName,
                 evaluation.ruleID,

@@ -156,7 +156,7 @@ internal fun createLayerExposureMetadata(
 ): LayerExposureMetadata {
     var allocatedExperiment = ""
     var exposures = configEvaluation.undelegatedSecondaryExposures
-    val isExplicit = configEvaluation.explicitParameters.contains(parameterName)
+    val isExplicit = configEvaluation.explicitParameters?.contains(parameterName) == true
     if (isExplicit) {
         exposures = configEvaluation.secondaryExposures
         allocatedExperiment = configEvaluation.configDelegate ?: ""
