@@ -10,7 +10,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
     private val calendarOne = Calendar.getInstance()
     private val calendarTwo = Calendar.getInstance()
     private var hashLookupTable: MutableMap<String, ULong> = HashMap()
-    private val gson = StatsigUtils.getGson()
+    private val gson = StatsigUtils.getGson(serializeNulls = true)
     fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
@@ -33,31 +33,98 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             // Delegate to evaluateConfig to construct the evaluation
             return evaluateConfig(user, config)
         }
-        if (config.isActive && persistedValues != null) {
-            val stickyValue = persistedValues?.get(configName)
-            if (stickyValue != null) {
-                // return sticky value
-                return gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
-            }
-            val evaluation = evaluateConfig(user, config)
-            if (evaluation.isExperimentGroup) {
-                persistentStorage?.save(user, config.idType, configName, gson.toJson(evaluation.toPersistedValueConfig()))
-            }
-            return evaluation
-        } else {
-            persistentStorage?.delete(user, config.idType, configName)
-            return evaluateConfig(user, config)
-        }
+        return evaluateConfigWithPersistedValues(user, config, persistedValues)
     }
 
-    fun getLayer(user: StatsigUser, layerName: String): ConfigEvaluation {
+    fun getLayer(user: StatsigUser, layerName: String, persistedValues: PersistedValues? = null): ConfigEvaluation {
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
             )
         }
+        val layer = specStore.getLayerConfig(layerName)
+        if (layer == null) {
+            // Delegate to evaluateConfig to construct the evaluation
+            return evaluateConfig(user, layer)
+        }
+        return evaluateLayerWithPersistedValues(user, layer, persistedValues)
+    }
 
-        return this.evaluateConfig(user, specStore.getLayerConfig(layerName))
+    private fun evaluateLayerWithPersistedValues(
+        user: StatsigUser,
+        layer: APIConfig,
+        persistedValues: PersistedValues?
+    ): ConfigEvaluation {
+        if (persistedValues == null) {
+            // Remove the sticky values from persistent storage if user persisted values is not provided
+            return evaluateAndDeleteFromPersistentStorage(user, layer)
+        }
+        val stickyValue = persistedValues[layer.name]
+        if (stickyValue != null) {
+            val stickyEvaluation = gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
+            if (this.allocatedExperimentExistsAndIsActive(stickyEvaluation)) {
+                // Return sticky evaluation if experiment exists and is active
+                return stickyEvaluation
+            } else {
+                // Remove the sticky values from persistent storage if the allocated experiment no longer exists or is no longer active
+                return this.evaluateAndDeleteFromPersistentStorage(user, layer)
+            }
+        } else {
+            val evaluation = evaluateConfig(user, layer)
+            if (this.allocatedExperimentExistsAndIsActive(evaluation)) {
+                if (evaluation.isExperimentGroup) {
+                    // If it doesn't exist and the user is in an experiment group, then save to persisted storage.
+                    persistentStorage?.save(user, layer.idType, layer.name, gson.toJson(evaluation.toPersistedValueConfig()))
+                }
+            } else {
+                // Remove the sticky values from persistent storage if the allocated experiment no longer exists or is no longer active.
+                persistentStorage?.delete(user, layer.idType, layer.name)
+            }
+
+            return evaluation
+        }
+    }
+
+    private fun allocatedExperimentExistsAndIsActive(evaluation: ConfigEvaluation): Boolean {
+        val delegate = if (evaluation.configDelegate != null) this.specStore.getConfig(evaluation.configDelegate) else null
+        return delegate != null && delegate.isActive
+    }
+
+    private fun evaluateConfigWithPersistedValues(
+        user: StatsigUser,
+        config: APIConfig,
+        persistedValues: PersistedValues?
+    ): ConfigEvaluation {
+        if (persistedValues == null || !config.isActive) {
+            // Remove the sticky values from persistent storage if experiment is not active or user persisted values is not provided
+            return evaluateAndDeleteFromPersistentStorage(user, config)
+        }
+        val stickyValue = persistedValues[config.name]
+        if (stickyValue != null) {
+            // return sticky value
+            return gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
+        }
+        // If it doesn't exist and the user is in an experiment group, then save to persisted storage.
+        return evaluateAndSaveToPersistentStorage(user, config)
+    }
+
+    private fun evaluateAndSaveToPersistentStorage(
+        user: StatsigUser,
+        config: APIConfig,
+    ): ConfigEvaluation {
+        val evaluation = evaluateConfig(user, config)
+        if (evaluation.isExperimentGroup) {
+            persistentStorage?.save(user, config.idType, config.name, gson.toJson(evaluation.toPersistedValueConfig()))
+        }
+        return evaluation
+    }
+
+    private fun evaluateAndDeleteFromPersistentStorage(
+        user: StatsigUser,
+        config: APIConfig,
+    ): ConfigEvaluation {
+        persistentStorage?.delete(user, config.idType, config.name)
+        return evaluateConfig(user, config)
     }
 
     private fun evaluateConfig(user: StatsigUser, config: APIConfig?): ConfigEvaluation {
@@ -162,7 +229,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             groupName = delegatedResult.groupName,
             secondaryExposures = secondaryExposures,
             configDelegate = configDelegate,
-            explicitParameters = config.explicitParameters ?: arrayOf(),
+            explicitParameters = config.explicitParameters,
             evaluationDetails = this.createEvaluationDetails(this.specStore.initReason),
             isExperimentGroup = delegatedResult.isExperimentGroup
         )

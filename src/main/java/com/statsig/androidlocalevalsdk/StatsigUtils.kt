@@ -20,8 +20,12 @@ internal object StatsigUtils {
         return value?.toString() ?: ""
     }
 
-    internal fun getGson(): Gson {
-        return GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE).create()
+    internal fun getGson(serializeNulls: Boolean = false): Gson {
+        val gson = GsonBuilder().setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        if (serializeNulls) {
+            return gson.serializeNulls().create()
+        }
+        return gson.create()
     }
 
     internal fun syncGetFromSharedPrefs(sharedPrefs: SharedPreferences?, key: String): String? {
