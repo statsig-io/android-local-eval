@@ -161,9 +161,10 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             ruleID = delegatedResult.ruleID,
             groupName = delegatedResult.groupName,
             secondaryExposures = secondaryExposures,
-            configDelegate = rule.configDelegate,
+            configDelegate = configDelegate,
             explicitParameters = config.explicitParameters ?: arrayOf(),
             evaluationDetails = this.createEvaluationDetails(this.specStore.initReason),
+            isExperimentGroup = delegatedResult.isExperimentGroup
         )
         evaluation.undelegatedSecondaryExposures = undelegatedSecondaryExposures
         return evaluation
