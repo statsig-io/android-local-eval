@@ -6,6 +6,13 @@ import java.security.MessageDigest
 import java.util.Calendar
 import java.util.Date
 
+internal data class PersistedEvaluationArgs(
+    val user: StatsigUser,
+    val unhashedName: String,
+    val config: APIConfig,
+    val persistedValues: PersistedValues?
+)
+
 internal class Evaluator(private val specStore: Store, private val errorBoundary: ErrorBoundary, private val persistentStorage: StatsigUserPersistenStorageHelper?) {
     private val calendarOne = Calendar.getInstance()
     private val calendarTwo = Calendar.getInstance()
@@ -33,7 +40,9 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             // Delegate to evaluateConfig to construct the evaluation
             return evaluateConfig(user, config)
         }
-        return evaluateConfigWithPersistedValues(user, config, persistedValues)
+        return evaluateConfigWithPersistedValues(
+            PersistedEvaluationArgs(user, configName, config, persistedValues)
+        )
     }
 
     fun getLayer(user: StatsigUser, layerName: String, persistedValues: PersistedValues? = null): ConfigEvaluation {
@@ -47,19 +56,17 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             // Delegate to evaluateConfig to construct the evaluation
             return evaluateConfig(user, layer)
         }
-        return evaluateLayerWithPersistedValues(user, layer, persistedValues)
+        return evaluateLayerWithPersistedValues(
+            PersistedEvaluationArgs(user, layerName, layer, persistedValues)
+        )
     }
 
-    private fun evaluateLayerWithPersistedValues(
-        user: StatsigUser,
-        layer: APIConfig,
-        persistedValues: PersistedValues?
-    ): ConfigEvaluation {
-        if (persistedValues == null) {
+    private fun evaluateLayerWithPersistedValues(args: PersistedEvaluationArgs): ConfigEvaluation {
+        if (args.persistedValues == null) {
             // Remove the sticky values from persistent storage if user persisted values is not provided
-            return evaluateAndDeleteFromPersistentStorage(user, layer)
+            return evaluateAndDeleteFromPersistentStorage(args)
         }
-        val stickyValue = persistedValues[layer.name]
+        val stickyValue = args.persistedValues[args.unhashedName]
         if (stickyValue != null) {
             val stickyEvaluation = gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
             if (this.allocatedExperimentExistsAndIsActive(stickyEvaluation)) {
@@ -67,18 +74,18 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
                 return stickyEvaluation
             } else {
                 // Remove the sticky values from persistent storage if the allocated experiment no longer exists or is no longer active
-                return this.evaluateAndDeleteFromPersistentStorage(user, layer)
+                return this.evaluateAndDeleteFromPersistentStorage(args)
             }
         } else {
-            val evaluation = evaluateConfig(user, layer)
+            val evaluation = evaluateConfig(args.user, args.config)
             if (this.allocatedExperimentExistsAndIsActive(evaluation)) {
                 if (evaluation.isExperimentGroup) {
                     // If it doesn't exist and the user is in an experiment group, then save to persisted storage.
-                    persistentStorage?.save(user, layer.idType, layer.name, gson.toJson(evaluation.toPersistedValueConfig()))
+                    persistentStorage?.save(args.user, args.config.idType, args.unhashedName, gson.toJson(evaluation.toPersistedValueConfig()))
                 }
             } else {
                 // Remove the sticky values from persistent storage if the allocated experiment no longer exists or is no longer active.
-                persistentStorage?.delete(user, layer.idType, layer.name)
+                persistentStorage?.delete(args.user, args.config.idType, args.unhashedName)
             }
 
             return evaluation
@@ -90,41 +97,31 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
         return delegate != null && delegate.isActive
     }
 
-    private fun evaluateConfigWithPersistedValues(
-        user: StatsigUser,
-        config: APIConfig,
-        persistedValues: PersistedValues?
-    ): ConfigEvaluation {
-        if (persistedValues == null || !config.isActive) {
+    private fun evaluateConfigWithPersistedValues(args: PersistedEvaluationArgs): ConfigEvaluation {
+        if (args.persistedValues == null || !args.config.isActive) {
             // Remove the sticky values from persistent storage if experiment is not active or user persisted values is not provided
-            return evaluateAndDeleteFromPersistentStorage(user, config)
+            return evaluateAndDeleteFromPersistentStorage(args)
         }
-        val stickyValue = persistedValues[config.name]
+        val stickyValue = args.persistedValues[args.unhashedName]
         if (stickyValue != null) {
             // return sticky value
             return gson.fromJson(stickyValue, PersistedValueConfig::class.java).toConfigEvaluationData()
         }
         // If it doesn't exist and the user is in an experiment group, then save to persisted storage.
-        return evaluateAndSaveToPersistentStorage(user, config)
+        return evaluateAndSaveToPersistentStorage(args)
     }
 
-    private fun evaluateAndSaveToPersistentStorage(
-        user: StatsigUser,
-        config: APIConfig,
-    ): ConfigEvaluation {
-        val evaluation = evaluateConfig(user, config)
+    private fun evaluateAndSaveToPersistentStorage(args: PersistedEvaluationArgs): ConfigEvaluation {
+        val evaluation = evaluateConfig(args.user, args.config)
         if (evaluation.isExperimentGroup) {
-            persistentStorage?.save(user, config.idType, config.name, gson.toJson(evaluation.toPersistedValueConfig()))
+            persistentStorage?.save(args.user, args.config.idType, args.unhashedName, gson.toJson(evaluation.toPersistedValueConfig()))
         }
         return evaluation
     }
 
-    private fun evaluateAndDeleteFromPersistentStorage(
-        user: StatsigUser,
-        config: APIConfig,
-    ): ConfigEvaluation {
-        persistentStorage?.delete(user, config.idType, config.name)
-        return evaluateConfig(user, config)
+    private fun evaluateAndDeleteFromPersistentStorage(args: PersistedEvaluationArgs): ConfigEvaluation {
+        persistentStorage?.delete(args.user, args.config.idType, args.unhashedName)
+        return evaluateConfig(args.user, args.config)
     }
 
     private fun evaluateConfig(user: StatsigUser, config: APIConfig?): ConfigEvaluation {
