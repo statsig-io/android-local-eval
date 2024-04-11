@@ -152,11 +152,12 @@ class StatsigClient {
      * @return the Dynamic Config backing the experiment
      */
     @JvmOverloads
-    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig? {
-        if (!isInitialized("getExperiment")) {
-            return null
-        }
+    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
+        if (!isInitialized("getExperiment")) {
+            result.evaluationDetails = EvaluationDetails(0,EvaluationReason.UNINITIALIZED)
+            return result
+        }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, experimentName, option?.userPersistedValues)
@@ -191,11 +192,12 @@ class StatsigClient {
      * @return DynamicConfig object evaluated for the selected StatsigUser
      */
     @JvmOverloads
-    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig? {
-        if (!isInitialized("getConfig")) {
-            return null
-        }
+    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
+        if (!isInitialized("getExperiment")) {
+            result.evaluationDetails = EvaluationDetails(0,EvaluationReason.UNINITIALIZED)
+            return result
+        }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
@@ -229,11 +231,11 @@ class StatsigClient {
      * @return the current layer values as a Layer object
      */
     @JvmOverloads
-    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer? {
-        if (!isInitialized("getLayer")) {
-            return null
-        }
+    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
         var result = Layer.empty(layerName)
+        if (!isInitialized("getExperiment")) {
+            return result
+        }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getLayer(normalizedUser, layerName, option?.userPersistedValues)
