@@ -12,8 +12,9 @@ class Layer internal constructor(
     val value: Map<String, Any>,
     val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
     val allocatedExperiment: String = "",
+    var evaluationDetails: EvaluationDetails? = null,
     private val onExposure: OnLayerExposureInternal? = null,
-) {
+    ) {
 
     companion object {
         fun empty(name: String): Layer {

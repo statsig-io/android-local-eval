@@ -234,6 +234,7 @@ class StatsigClient {
     fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
         var result = Layer.empty(layerName)
         if (!isInitialized("getExperiment")) {
+            result.evaluationDetails = EvaluationDetails(0,EvaluationReason.UNINITIALIZED)
             return result
         }
         errorBoundary.capture({
@@ -246,6 +247,7 @@ class StatsigClient {
                 evaluation.jsonValue as? Map<String, Any> ?: mapOf(),
                 evaluation.secondaryExposures,
                 evaluation.configDelegate ?: "",
+                evaluation.evaluationDetails,
                 onExposure = getExposureFun(option?.disableExposureLogging == true, evaluation, normalizedUser),
             )
         }, tag = "getLayer", configName = layerName)
