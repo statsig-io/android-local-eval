@@ -71,7 +71,6 @@ class DiagnosticsTest {
         }
         client.shutdown()
         val apiMarkers = parseMarkers(ContextType.API_CALL)
-        println(apiMarkers.size)
         assert(apiMarkers.size == MAX_MARKERS)
     }
 

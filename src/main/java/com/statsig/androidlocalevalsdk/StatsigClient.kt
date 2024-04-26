@@ -7,7 +7,6 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.annotation.VisibleForTesting
-import com.statsig.androidsdk.StatsigNetworkConnectivityListener
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -155,7 +154,7 @@ class StatsigClient {
     fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
         if (!isInitialized("getExperiment")) {
-            result.evaluationDetails = EvaluationDetails(0,EvaluationReason.UNINITIALIZED)
+            result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
             return result
         }
         errorBoundary.capture({
@@ -195,7 +194,7 @@ class StatsigClient {
     fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
         if (!isInitialized("getExperiment")) {
-            result.evaluationDetails = EvaluationDetails(0,EvaluationReason.UNINITIALIZED)
+            result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
             return result
         }
         errorBoundary.capture({
@@ -234,7 +233,7 @@ class StatsigClient {
     fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
         var result = Layer.empty(layerName)
         if (!isInitialized("getExperiment")) {
-            result.evaluationDetails = EvaluationDetails(0,EvaluationReason.UNINITIALIZED)
+            result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
             return result
         }
         errorBoundary.capture({
@@ -365,7 +364,7 @@ class StatsigClient {
         diagnostics = Diagnostics(options.disableDiagnosticsLogging)
         if (!this::statsigNetwork.isInitialized) {
             // For testing purpose, prevent mocked network be overwritten
-            statsigNetwork = StatsigNetwork(application,sdkKey, options, sharedPrefs, diagnostics)
+            statsigNetwork = StatsigNetwork(application, sdkKey, options, sharedPrefs, diagnostics)
         }
         statsigMetadata = StatsigMetadata()
         populateStatsigMetadata()

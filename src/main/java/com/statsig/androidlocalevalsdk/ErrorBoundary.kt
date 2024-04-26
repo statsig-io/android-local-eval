@@ -2,6 +2,9 @@ package com.statsig.androidlocalevalsdk
 
 import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.DataOutputStream
 import java.lang.Math.floor
 import java.net.HttpURLConnection
@@ -45,6 +48,16 @@ internal class ErrorBoundary() {
         }
     }
 
+    fun getUrl(): String {
+        return urlString
+    }
+
+    fun getNoopExceptionHandler(): CoroutineExceptionHandler {
+        return CoroutineExceptionHandler { _, _ ->
+            // No-op
+        }
+    }
+
     fun <T> capture(task: () -> T, tag: String? = null, recover: (() -> T)? = null, configName: String? = null): T? {
         var markerID = ""
         return try {
@@ -79,39 +92,41 @@ internal class ErrorBoundary() {
 
     internal fun logException(exception: Throwable, message: String? = null, tag: String? = null, configName: String? = null) {
         try {
-            Log.e("STATSIG", "An unexpected exception occured: " + exception)
-            if (message != null) {
-                Log.e("STATSIG", message)
-            }
-            val name = exception.javaClass.canonicalName ?: exception.javaClass.name
-            if (seen.contains(name)) {
-                return
-            }
-            seen.add(name)
+            CoroutineScope(this.getNoopExceptionHandler() + Dispatchers.IO).launch {
+                Log.e("STATSIG", "An unexpected exception occured: " + exception)
+                if (message != null) {
+                    Log.e("STATSIG", message)
+                }
+                val name = exception.javaClass.canonicalName ?: exception.javaClass.name
+                if (seen.contains(name)) {
+                    return@launch
+                }
+                seen.add(name)
 
-            val metadata = statsigMetadata ?: StatsigMetadata("")
-            val body = mutableMapOf(
-                "exception" to name,
-                "info" to RuntimeException(exception).stackTraceToString(),
-                "statsigMetadata" to metadata,
-            )
-            if (tag != null) {
-                body["tag"] = tag
-            }
-            if (configName != null) {
-                body["configName"] = configName
-            }
-            val postData = StatsigUtils.getGson().toJson(body)
+                val metadata = statsigMetadata ?: StatsigMetadata("")
+                val body = mutableMapOf(
+                    "exception" to name,
+                    "info" to RuntimeException(exception).stackTraceToString(),
+                    "statsigMetadata" to metadata,
+                )
+                if (tag != null) {
+                    body["tag"] = tag
+                }
+                if (configName != null) {
+                    body["configName"] = configName
+                }
+                val postData = StatsigUtils.getGson().toJson(body)
 
-            val conn = URL(urlString).openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.setRequestProperty("STATSIG-API-KEY", apiKey)
-            conn.useCaches = false
+                val conn = URL(getUrl()).openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("STATSIG-API-KEY", apiKey)
+                conn.useCaches = false
 
-            DataOutputStream(conn.outputStream).use { it.writeBytes(postData) }
-            conn.responseCode // triggers request
+                DataOutputStream(conn.outputStream).use { it.writeBytes(postData) }
+                conn.responseCode // triggers request
+            }
         } catch (e: Exception) {
         }
     }
