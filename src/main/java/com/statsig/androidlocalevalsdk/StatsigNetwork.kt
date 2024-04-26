@@ -200,10 +200,9 @@ internal class StatsigNetwork(
                             statusCode = code,
                             error = errorMarker,
                             attempt = retryAttempt,
-                            hasNetwork = connectivityListener.isNetworkAvailable()
+                            hasNetwork = connectivityListener.isNetworkAvailable(),
                         ),
                     )
-
                     when (code) {
                         in 200..299 -> {
                             if (code == 204) {
@@ -237,7 +236,7 @@ internal class StatsigNetwork(
                     Marker(
                         error = Marker.ErrorMessage(message = e.message, name = e.javaClass.name),
                         attempt = retryAttempt,
-                        hasNetwork = connectivityListener.isNetworkAvailable()
+                        hasNetwork = connectivityListener.isNetworkAvailable(),
                     ),
                 )
                 // Leave to ErrorBoundary to handle

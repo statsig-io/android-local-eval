@@ -10,7 +10,7 @@ internal data class PersistedEvaluationArgs(
     val user: StatsigUser,
     val unhashedName: String,
     val config: APIConfig,
-    val persistedValues: PersistedValues?
+    val persistedValues: PersistedValues?,
 )
 
 internal class Evaluator(private val specStore: Store, private val errorBoundary: ErrorBoundary, private val persistentStorage: StatsigUserPersistenStorageHelper?) {
@@ -41,7 +41,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             return evaluateConfig(user, config)
         }
         return evaluateConfigWithPersistedValues(
-            PersistedEvaluationArgs(user, configName, config, persistedValues)
+            PersistedEvaluationArgs(user, configName, config, persistedValues),
         )
     }
 
@@ -57,7 +57,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             return evaluateConfig(user, layer)
         }
         return evaluateLayerWithPersistedValues(
-            PersistedEvaluationArgs(user, layerName, layer, persistedValues)
+            PersistedEvaluationArgs(user, layerName, layer, persistedValues),
         )
     }
 
@@ -228,7 +228,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             configDelegate = configDelegate,
             explicitParameters = config.explicitParameters,
             evaluationDetails = this.createEvaluationDetails(this.specStore.initReason),
-            isExperimentGroup = delegatedResult.isExperimentGroup
+            isExperimentGroup = delegatedResult.isExperimentGroup,
         )
         evaluation.undelegatedSecondaryExposures = undelegatedSecondaryExposures
         return evaluation
