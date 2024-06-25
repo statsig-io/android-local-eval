@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkConstructor
 import io.mockk.spyk
+import io.mockk.unmockkAll
 import kotlinx.coroutines.*
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -55,13 +56,6 @@ class StatsigInitializationTimeoutTest {
         TestUtil.mockDispatchers()
         TestUtil.stubAppFunctions(app)
 
-        // Lets get a successful network response, and then trigger error boundary
-        // so we can test that eb does not block the initialization beyond the init timeout
-        mockkConstructor(Store::class)
-        coEvery {
-            anyConstructed<Store>().fetchAndSave()
-        } throws(Exception("trigger the error boundary"))
-
         every {
             errorBoundary.getUrl()
         } returns mockWebServer.url("/v1/sdk_exception").toString()
@@ -73,10 +67,17 @@ class StatsigInitializationTimeoutTest {
     @After
     fun tearDown() {
         mockWebServer.shutdown()
+        unmockkAll()
     }
 
     @Test
     fun testInitializeAsyncWithSlowErrorBoundary() = runBlocking {
+        // Lets get a successful network response, and then trigger error boundary
+        // so we can test that eb does not block the initialization beyond the init timeout
+        mockkConstructor(Store::class)
+        coEvery {
+            anyConstructed<Store>().fetchAndSave()
+        } throws(Exception("trigger the error boundary"))
         var initializationDetails: InitializationDetails? = null
         var initTimeout = 500
         runBlocking {
@@ -95,5 +96,31 @@ class StatsigInitializationTimeoutTest {
 
         // error boundary was hit, but has not completed at this point, so the initialization timeout worked
         assert(hitErrorBoundary.await(1, TimeUnit.SECONDS))
+    }
+
+    @Test
+    fun testInitializationTimeout() = runBlocking {
+        val timeout = 300
+        mockWebServer.apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == null) {
+                        return MockResponse().setResponseCode(404)
+                    }
+                    if ("/v1/download_config_specs" in request.path!!) {
+                        Thread.sleep(timeout.toLong() + 1000)
+                        return MockResponse().setResponseCode(200)
+                    }
+                    if ("/v1/log_event" in request.path!!) {
+                        Thread.sleep(timeout.toLong() + 1000)
+                        return MockResponse().setResponseCode(200)
+                    }
+                    return MockResponse().setResponseCode(400)
+                }
+            }
+        }
+        val option = StatsigOptions(initTimeoutMs = timeout, configSpecApi = mockWebServer.url("/v1/download_config_specs").toString(), eventLoggingAPI = mockWebServer.url("/v1/log_event").toString())
+        val initializationDetails = Statsig.client.initialize(app, "client-key", option)
+        assert((initializationDetails?.duration?.toInt() ?: timeout < timeout + 100)) // 100 is buffer time for other setup job
     }
 }

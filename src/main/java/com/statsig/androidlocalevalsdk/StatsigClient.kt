@@ -364,7 +364,7 @@ class StatsigClient {
         diagnostics = Diagnostics(options.disableDiagnosticsLogging)
         if (!this::statsigNetwork.isInitialized) {
             // For testing purpose, prevent mocked network be overwritten
-            statsigNetwork = StatsigNetwork(application, sdkKey, options, sharedPrefs, diagnostics)
+            statsigNetwork = StatsigNetwork(application, sdkKey, options, sharedPrefs, diagnostics, statsigScope)
         }
         statsigMetadata = StatsigMetadata()
         populateStatsigMetadata()
@@ -394,7 +394,9 @@ class StatsigClient {
             val initStartTime = StatsigUtils.getTimeInMillis()
             return@withContext errorBoundary.captureAsync({
                 diagnostics.markStart(KeyType.OVERALL)
-                statsigLogger.retryFailedLog(sharedPrefs)
+                statsigScope.launch {
+                    statsigLogger.retryFailedLog(sharedPrefs)
+                }
                 if (this@StatsigClient.isBootstrapped.get()) {
                     diagnostics.markEnd(KeyType.OVERALL, true)
                     return@captureAsync InitializationDetails(System.currentTimeMillis() - initStartTime, true, null)
