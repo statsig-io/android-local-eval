@@ -3,8 +3,10 @@ package com.statsig.androidlocalevalsdk
 import android.content.Context
 import android.content.SharedPreferences
 import com.statsig.androidsdk.StatsigNetworkConnectivityListener
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.BufferedReader
@@ -41,6 +43,7 @@ internal class StatsigNetwork(
     private val options: StatsigOptions,
     private val sharedPrefs: SharedPreferences,
     private val diagnostics: Diagnostics,
+    private val statsigScope: CoroutineScope,
 ) {
     private val dispatcherProvider = CoroutineDispatcherProvider()
     private val gson = StatsigUtils.getGson()
@@ -83,12 +86,16 @@ internal class StatsigNetwork(
             )
         } else {
             return withTimeout(options.initTimeoutMs.toLong()) {
-                getRequest(
-                    endpoint,
-                    RETRY_LIMIT,
-                    options.initTimeoutMs,
-                    callback,
-                )
+                var response: APIDownloadedConfigs? = null
+                statsigScope.launch {
+                    response = getRequest(
+                        endpoint,
+                        RETRY_LIMIT,
+                        options.initTimeoutMs,
+                        callback,
+                    )
+                }.join()
+                return@withTimeout response
             }
         }
     }
