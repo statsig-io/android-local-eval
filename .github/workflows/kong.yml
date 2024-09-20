@@ -40,7 +40,7 @@ jobs:
         run: npm install
 
       - name: Setup Android Local Eval SDK
-        run: npm run kong -- setup android-local-eval -v
+        run: npm run kong -- setup android-local-eval
 
       - name: Run Tests
-        run: npm run kong -- test android-local-eval -v -r
+        run: npm run kong -- test android-local-eval --allow-retries
