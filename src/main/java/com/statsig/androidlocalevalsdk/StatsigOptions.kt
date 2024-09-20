@@ -62,6 +62,10 @@ class StatsigOptions(
      * Interface to load/save/delete configs
      */
     @SerializedName("userPersistentStorageProvider") var userPersistentStorage: UserPersistentStorageInterface? = null,
+    /**
+     * Plugin to override SDK evaluations
+     */
+    @SerializedName("overrideAdapter") var overrideAdapter: IOverrideAdapter? = null,
 ) {
 
     private var environment: MutableMap<String, String>? = null

@@ -118,7 +118,7 @@ class StatsigClient {
         var result = false
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.checkGate(normalizedUser, gateName)
+            val evaluation = evaluator.checkGate(normalizedUser, gateName, option)
             result = evaluation.booleanValue
             if (option?.disableExposureLogging !== true) {
                 logGateExposureImpl(normalizedUser, gateName, evaluation)
@@ -138,7 +138,7 @@ class StatsigClient {
         }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.checkGate(normalizedUser, gateName)
+            val evaluation = evaluator.checkGate(normalizedUser, gateName, null)
             logGateExposureImpl(normalizedUser, gateName, evaluation, true)
         }, tag = "logGateExposure", configName = gateName)
     }
@@ -159,7 +159,7 @@ class StatsigClient {
         }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getConfig(normalizedUser, experimentName, option?.userPersistedValues)
+            val evaluation = evaluator.getExperiment(normalizedUser, experimentName, option)
             result = getDynamicConfigFromEvalResult(evaluation, experimentName)
             if (option?.disableExposureLogging !== true) {
                 logConfigExposureImpl(normalizedUser, experimentName, evaluation)
@@ -176,7 +176,7 @@ class StatsigClient {
     fun logExperimentExposure(user: StatsigUser, experimentName: String) {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getConfig(normalizedUser, experimentName)
+            val evaluation = evaluator.getConfig(normalizedUser, experimentName, null)
             logConfigExposureImpl(normalizedUser, experimentName, evaluation, true)
         }, tag = "logExperimentExposure", configName = experimentName)
     }
@@ -199,7 +199,7 @@ class StatsigClient {
         }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
+            val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName, option)
             result = getDynamicConfigFromEvalResult(evaluation, dynamicConfigName)
             if (option?.disableExposureLogging !== true) {
                 logConfigExposureImpl(normalizedUser, dynamicConfigName, evaluation)
@@ -219,7 +219,7 @@ class StatsigClient {
         }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName)
+            val evaluation = evaluator.getConfig(normalizedUser, dynamicConfigName, null)
             logConfigExposureImpl(normalizedUser, dynamicConfigName, evaluation, true)
         }, tag = "logConfigExposure", configName = dynamicConfigName)
     }
@@ -238,7 +238,7 @@ class StatsigClient {
         }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getLayer(normalizedUser, layerName, option?.userPersistedValues)
+            val evaluation = evaluator.getLayer(normalizedUser, layerName, option)
             result = Layer(
                 layerName,
                 evaluation.ruleID,
@@ -264,7 +264,7 @@ class StatsigClient {
         }
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
-            val evaluation = evaluator.getLayer(normalizedUser, layerName)
+            val evaluation = evaluator.getLayer(normalizedUser, layerName, null)
             val layer = Layer(
                 layerName,
                 evaluation.ruleID,
@@ -349,7 +349,8 @@ class StatsigClient {
         }
     }
 
-    private fun setup(
+    @VisibleForTesting
+    internal fun setup(
         application: Application,
         sdkKey: String,
         options: StatsigOptions = StatsigOptions(),
@@ -374,7 +375,7 @@ class StatsigClient {
         errorBoundary.setDiagnostics(diagnostics)
         errorBoundary.setMetadata(statsigMetadata)
         specStore = Store(sdkKey, statsigNetwork, statsigScope, sharedPrefs, errorBoundary, diagnostics)
-        evaluator = Evaluator(specStore, errorBoundary, persistentStorage)
+        evaluator = Evaluator(specStore, errorBoundary, persistentStorage, options.overrideAdapter)
 
         // load cache
         if (!options.loadCacheAsync) {

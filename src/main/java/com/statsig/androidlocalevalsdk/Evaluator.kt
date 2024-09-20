@@ -13,12 +13,23 @@ internal data class PersistedEvaluationArgs(
     val persistedValues: PersistedValues?,
 )
 
-internal class Evaluator(private val specStore: Store, private val errorBoundary: ErrorBoundary, private val persistentStorage: StatsigUserPersistenStorageHelper?) {
+internal class Evaluator(
+    private val specStore: Store,
+    private val errorBoundary: ErrorBoundary,
+    private val persistentStorage: StatsigUserPersistenStorageHelper?,
+    private val overrideAdapter: IOverrideAdapter?,
+) {
     private val calendarOne = Calendar.getInstance()
     private val calendarTwo = Calendar.getInstance()
     private var hashLookupTable: MutableMap<String, ULong> = HashMap()
     private val gson = StatsigUtils.getGson(serializeNulls = true)
-    fun checkGate(user: StatsigUser, name: String): ConfigEvaluation {
+    fun checkGate(user: StatsigUser, name: String, options: CheckGateOptions?): ConfigEvaluation {
+        if (this.overrideAdapter != null) {
+            val override = this.overrideAdapter.checkGate(user, name, options)
+            if (override != null) {
+                return ConfigEvaluation.fromGateOverride(override, specStore.lcut)
+            }
+        }
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
@@ -29,7 +40,27 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
         return this.evaluateConfig(user, evalGate)
     }
 
-    fun getConfig(user: StatsigUser, configName: String, persistedValues: PersistedValues? = null): ConfigEvaluation {
+    fun getConfig(user: StatsigUser, configName: String, options: GetConfigOptions?): ConfigEvaluation {
+        if (this.overrideAdapter != null) {
+            val override = this.overrideAdapter.getConfig(user, configName, options)
+            if (override != null) {
+                return ConfigEvaluation.fromConfigOverride(override, specStore.lcut)
+            }
+        }
+        return this.getConfigImpl(user, configName)
+    }
+
+    fun getExperiment(user: StatsigUser, experimentName: String, options: GetExperimentOptions?): ConfigEvaluation {
+        if (this.overrideAdapter != null) {
+            val override = this.overrideAdapter.getExperiment(user, experimentName, options)
+            if (override != null) {
+                return ConfigEvaluation.fromConfigOverride(override, specStore.lcut)
+            }
+        }
+        return this.getConfigImpl(user, experimentName, options?.userPersistedValues)
+    }
+
+    private fun getConfigImpl(user: StatsigUser, configName: String, persistedValues: PersistedValues? = null): ConfigEvaluation {
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
@@ -45,7 +76,13 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
         )
     }
 
-    fun getLayer(user: StatsigUser, layerName: String, persistedValues: PersistedValues? = null): ConfigEvaluation {
+    fun getLayer(user: StatsigUser, layerName: String, options: GetLayerOptions?): ConfigEvaluation {
+        if (this.overrideAdapter != null) {
+            val override = this.overrideAdapter.getLayer(user, layerName, options)
+            if (override != null) {
+                return ConfigEvaluation.fromLayerOverride(override, specStore.lcut)
+            }
+        }
         if (specStore.initReason == EvaluationReason.UNINITIALIZED) {
             return ConfigEvaluation(
                 evaluationDetails = createEvaluationDetails(EvaluationReason.UNINITIALIZED),
@@ -57,7 +94,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
             return evaluateConfig(user, layer)
         }
         return evaluateLayerWithPersistedValues(
-            PersistedEvaluationArgs(user, layerName, layer, persistedValues),
+            PersistedEvaluationArgs(user, layerName, layer, options?.userPersistedValues),
         )
     }
 
@@ -250,7 +287,7 @@ internal class Evaluator(private val specStore: Store, private val errorBoundary
 
                 ConfigCondition.FAIL_GATE, ConfigCondition.PASS_GATE -> {
                     val name = StatsigUtils.toStringOrEmpty(condition.targetValue)
-                    val result = this.checkGate(user, name)
+                    val result = this.checkGate(user, name, null)
                     val newExposure =
                         mapOf(
                             "gate" to name,

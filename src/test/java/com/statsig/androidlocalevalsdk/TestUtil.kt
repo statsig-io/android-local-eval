@@ -98,6 +98,10 @@ class TestUtil {
                 println(firstArg<String>() + ": " + secondArg())
                 0
             }
+            every { Log.w(any(), any<String>()) } answers {
+                println(firstArg<String>() + ": " + secondArg<String>())
+                0
+            }
             every { Log.e(any(), any()) } answers {
                 println(firstArg<String>() + ": " + secondArg())
                 0

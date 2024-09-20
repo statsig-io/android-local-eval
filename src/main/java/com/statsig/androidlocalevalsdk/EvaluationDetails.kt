@@ -24,4 +24,5 @@ enum class EvaluationReason(val reason: String) {
     CACHE("Cache"),
     UNSUPPORTED("Unsupported"),
     PERSISTED("Persisted"),
+    LOCAL_OVERRIDE("LocalOverride"),
 }

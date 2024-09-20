@@ -29,6 +29,35 @@ internal class ConfigEvaluation(
             time = this.evaluationDetails?.configSyncTime,
         )
     }
+
+    companion object {
+        fun fromGateOverride(override: Boolean, configSyncTime: Long): ConfigEvaluation {
+            return ConfigEvaluation(
+                booleanValue = override,
+                evaluationDetails = EvaluationDetails(configSyncTime, EvaluationReason.LOCAL_OVERRIDE),
+            )
+        }
+
+        fun fromConfigOverride(override: DynamicConfig, configSyncTime: Long): ConfigEvaluation {
+            return ConfigEvaluation(
+                jsonValue = override.value,
+                ruleID = override.ruleID ?: "",
+                groupName = override.groupName,
+                secondaryExposures = override.secondaryExposures,
+                evaluationDetails = EvaluationDetails(configSyncTime, EvaluationReason.LOCAL_OVERRIDE),
+            )
+        }
+
+        fun fromLayerOverride(override: Layer, configSyncTime: Long): ConfigEvaluation {
+            return ConfigEvaluation(
+                jsonValue = override.value,
+                ruleID = override.ruleID ?: "",
+                groupName = override.groupName,
+                secondaryExposures = override.secondaryExposures,
+                evaluationDetails = EvaluationDetails(configSyncTime, EvaluationReason.LOCAL_OVERRIDE),
+            )
+        }
+    }
 }
 
 internal class PersistedValueConfig(
