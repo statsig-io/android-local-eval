@@ -288,15 +288,20 @@ internal class Evaluator(
                 ConfigCondition.FAIL_GATE, ConfigCondition.PASS_GATE -> {
                     val name = StatsigUtils.toStringOrEmpty(condition.targetValue)
                     val result = this.checkGate(user, name, null)
-                    val newExposure =
-                        mapOf(
-                            "gate" to name,
-                            "gateValue" to result.booleanValue.toString(),
-                            "ruleID" to result.ruleID,
-                        )
+
                     val secondaryExposures = arrayListOf<Map<String, String>>()
                     secondaryExposures.addAll(result.secondaryExposures)
-                    secondaryExposures.add(newExposure)
+
+                    if (!name.startsWith("segment:")) {
+                        val newExposure =
+                            mapOf(
+                                "gate" to name,
+                                "gateValue" to result.booleanValue.toString(),
+                                "ruleID" to result.ruleID,
+                            )
+                        secondaryExposures.add(newExposure)
+                    }
+
                     return ConfigEvaluation(
                         if (conditionEnum == ConfigCondition.PASS_GATE) {
                             result.booleanValue
