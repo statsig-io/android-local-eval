@@ -40,6 +40,7 @@ class StatsigClient {
     private var persistentStorage: StatsigUserPersistenStorageHelper? = null
     private var initialized = AtomicBoolean(false)
     private var isBootstrapped = AtomicBoolean(false)
+    private var globalUser: StatsigUser? = null
 
     /**
      * Initializes the SDK for the given user
@@ -102,6 +103,10 @@ class StatsigClient {
         })
     }
 
+    fun setGlobalUser(user: StatsigUser) {
+        globalUser = user
+    }
+
     /**
      * Get the boolean result of a gate, evaluated against a given user.
      * An exposure event will automatically be logged for the gate.
@@ -111,7 +116,7 @@ class StatsigClient {
      * @param option advanced setup for checkGate, for example disable exposure logging
      */
     @JvmOverloads
-    fun checkGate(user: StatsigUser, gateName: String, option: CheckGateOptions? = null): Boolean {
+    fun checkGate(user: StatsigUser?, gateName: String, option: CheckGateOptions? = null): Boolean {
         if (!isInitialized("checkGate")) {
             return false
         }
@@ -132,7 +137,7 @@ class StatsigClient {
      * @param user A StatsigUser object used for logging
      * @param gateName the name of the gate to log an exposure for
      */
-    fun logGateExposure(user: StatsigUser, gateName: String) {
+    fun logGateExposure(user: StatsigUser?, gateName: String) {
         if (!isInitialized("logGateExposure")) {
             return
         }
@@ -151,7 +156,7 @@ class StatsigClient {
      * @return the Dynamic Config backing the experiment
      */
     @JvmOverloads
-    fun getExperiment(user: StatsigUser, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
+    fun getExperiment(user: StatsigUser?, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
         if (!isInitialized("getExperiment")) {
             result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
@@ -173,7 +178,7 @@ class StatsigClient {
      * @param user A StatsigUser object used for logging
      * @param experimentName the name of the experiment to log an exposure for
      */
-    fun logExperimentExposure(user: StatsigUser, experimentName: String) {
+    fun logExperimentExposure(user: StatsigUser?, experimentName: String) {
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getConfig(normalizedUser, experimentName, null)
@@ -191,7 +196,7 @@ class StatsigClient {
      * @return DynamicConfig object evaluated for the selected StatsigUser
      */
     @JvmOverloads
-    fun getConfig(user: StatsigUser, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
+    fun getConfig(user: StatsigUser?, dynamicConfigName: String, option: GetConfigOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
         if (!isInitialized("getExperiment")) {
             result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
@@ -213,7 +218,7 @@ class StatsigClient {
      * @param user A StatsigUser object used for logging
      * @param configName the name of the experiment to log an exposure for
      */
-    fun logConfigExposure(user: StatsigUser, dynamicConfigName: String) {
+    fun logConfigExposure(user: StatsigUser?, dynamicConfigName: String) {
         if (!isInitialized("logConfigExposure")) {
             return
         }
@@ -230,7 +235,7 @@ class StatsigClient {
      * @return the current layer values as a Layer object
      */
     @JvmOverloads
-    fun getLayer(user: StatsigUser, layerName: String, option: GetLayerOptions? = null): Layer {
+    fun getLayer(user: StatsigUser?, layerName: String, option: GetLayerOptions? = null): Layer {
         var result = Layer.empty(layerName)
         if (!isInitialized("getExperiment")) {
             result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
@@ -258,7 +263,7 @@ class StatsigClient {
      * @param user A StatsigUser object used for logging
      * @param configName the name of the experiment to log an exposure for
      */
-    fun logLayerParameterExposure(user: StatsigUser, layerName: String, paramName: String) {
+    fun logLayerParameterExposure(user: StatsigUser?, layerName: String, paramName: String) {
         if (!isInitialized("logLayerParameterExposure")) {
             return
         }
@@ -282,10 +287,11 @@ class StatsigClient {
      * Load persisted values for given user and idType used for evaluation asynchronously,
      * callback will be called when value is ready
      * */
-    fun loadUserPersistedValuesAsync(user: StatsigUser, idType: String, callback: IPersistentStorageCallback) {
+    fun loadUserPersistedValuesAsync(user: StatsigUser?, idType: String, callback: IPersistentStorageCallback) {
         errorBoundary.capture(
             task = {
-                return@capture this.persistentStorage?.loadAsync(user, idType, callback)
+                val normalizedUser = normalizeUser(user)
+                return@capture this.persistentStorage?.loadAsync(normalizedUser, idType, callback)
             },
             tag = "loadUserPersistedValuesAsync",
         )
@@ -294,10 +300,11 @@ class StatsigClient {
     /*
      * Load persisted values for given user and idType used for evaluation
      * */
-    suspend fun loadUserPersistedValues(user: StatsigUser, idType: String): PersistedValues {
+    suspend fun loadUserPersistedValues(user: StatsigUser?, idType: String): PersistedValues {
         return errorBoundary.captureAsync(
             task = {
-                return@captureAsync this.persistentStorage?.load(user, idType) ?: mapOf()
+                val normalizedUser = normalizeUser(user)
+                return@captureAsync this.persistentStorage?.load(normalizedUser, idType) ?: mapOf()
             },
         ) ?: mapOf()
     }
@@ -308,12 +315,13 @@ class StatsigClient {
      * @param value an optional value assocaited with the event, for aggregations/analysis
      * @param metadata an optional map of metadata associated with the event
      */
-    fun logEvent(user: StatsigUser, eventName: String, value: String?, metadata: Map<String, String>?) {
+    fun logEvent(user: StatsigUser?, eventName: String, value: String?, metadata: Map<String, String>?) {
         if (!isInitialized("logEvent")) {
             return
         }
         errorBoundary.capture({
-            val event = LogEvent(eventName, value, metadata, user, statsigMetadata)
+            val normalizedUser = normalizeUser(user)
+            val event = LogEvent(eventName, value, metadata, normalizedUser, statsigMetadata)
             statsigScope.launch { statsigLogger.log(event) }
         }, tag = "logEvent")
     }
@@ -324,12 +332,13 @@ class StatsigClient {
      * @param value an optional value assocaited with the event
      * @param metadata an optional map of metadata associated with the event
      */
-    fun logEvent(user: StatsigUser, eventName: String, value: Double?, metadata: Map<String, String>?) {
+    fun logEvent(user: StatsigUser?, eventName: String, value: Double?, metadata: Map<String, String>?) {
         if (!isInitialized("logEvent")) {
             return
         }
         errorBoundary.capture({
-            val event = LogEvent(eventName, value, metadata, user, statsigMetadata)
+            val normalizedUser = normalizeUser(user)
+            val event = LogEvent(eventName, value, metadata, normalizedUser, statsigMetadata)
             statsigScope.launch { statsigLogger.log(event) }
         }, tag = "logEvent")
     }
@@ -419,9 +428,10 @@ class StatsigClient {
     }
 
     private fun normalizeUser(user: StatsigUser?): StatsigUser {
+        var internalUser = user ?: globalUser
         var normalizedUser = StatsigUser(null)
-        if (user != null) {
-            normalizedUser = user.getCopyForEvaluation()
+        if (internalUser != null) {
+            normalizedUser = internalUser.getCopyForEvaluation()
         }
         if (options.getEnvironment() != null) {
             normalizedUser.statsigEnvironment = options.getEnvironment()
