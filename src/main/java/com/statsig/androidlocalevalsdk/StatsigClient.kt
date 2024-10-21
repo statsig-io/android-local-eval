@@ -103,6 +103,41 @@ class StatsigClient {
         })
     }
 
+    @JvmOverloads
+    fun initializeSync(
+        application: Application,
+        sdkKey: String,
+        initialSpecs: String,
+        options: StatsigOptions = StatsigOptions(),
+    ): InitializationDetails? {
+        if (this@StatsigClient.isInitialized()) {
+            return InitializationDetails(0, true)
+        }
+        val initStartTime = System.currentTimeMillis()
+        return errorBoundary.capture({
+                options.initializeValues = initialSpecs
+                setup(application, sdkKey, options)
+                statsigScope.launch {
+                    statsigLogger.retryFailedLog(sharedPrefs)
+                }
+                diagnostics.markEnd(KeyType.OVERALL, true)
+                InitializationDetails(System.currentTimeMillis() - initStartTime, true, null)
+            },
+            tag = "initializeSync",
+        )
+    }
+
+    suspend fun updateAsync(): InitializationDetails {
+        val initStartTime = System.currentTimeMillis()
+        return errorBoundary.captureAsync({
+            val details = specStore.fetchAndSave()
+            InitializationDetails(System.currentTimeMillis() - initStartTime, details.success, details.failureDetails)
+        }, { e: Exception ->
+            return@captureAsync InitializationDetails(StatsigUtils.getTimeInMillis() - initStartTime, false, InitializeResponse.FailedInitializeResponse(InitializeFailReason.InternalError, e))
+        })
+    }
+
+
     fun setGlobalUser(user: StatsigUser) {
         globalUser = user
     }
@@ -387,13 +422,13 @@ class StatsigClient {
         evaluator = Evaluator(specStore, errorBoundary, persistentStorage, options.overrideAdapter)
 
         // load cache
-        if (!options.loadCacheAsync) {
+        if (!options.loadCacheAsync || options.useNewerCacheValuesOverProvidedValues) {
             specStore.syncLoadFromLocalStorage()
         }
         // load from initialized values if available
         val initializeValues = options.initializeValues
         if (initializeValues != null) {
-            specStore.bootstrap(initializeValues)
+            specStore.bootstrap(initializeValues, options)
             isBootstrapped.set(true)
         }
         this.initialized.set(true)

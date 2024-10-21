@@ -63,16 +63,22 @@ internal class Store(
         }
     }
 
-    fun bootstrap(initializeValues: String) {
+    fun bootstrap(initializeValues: String, options: StatsigOptions) {
         errorBoundary.capture(
             {
                 diagnostics.markStart(KeyType.BOOTSTRAP)
-                initReason = EvaluationReason.INVALID_BOOTSTRAP
                 val parsedConfigSpecs = gson.fromJson(initializeValues, APIDownloadedConfigs::class.java)
-                if (parsedConfigSpecs != null) {
-                    setConfigSpecs(parsedConfigSpecs)
-                    initReason = EvaluationReason.BOOTSTRAP
+                if (parsedConfigSpecs == null) {
+                    initReason = EvaluationReason.INVALID_BOOTSTRAP
+                    return@capture
                 }
+                if (options.useNewerCacheValuesOverProvidedValues) {
+                    if (parsedConfigSpecs.time < this.lcut) {
+                        return@capture
+                    }
+                }
+                setConfigSpecs(parsedConfigSpecs)
+                initReason = EvaluationReason.BOOTSTRAP
                 diagnostics.markEnd(KeyType.BOOTSTRAP, true)
             },
             tag = "bootstrap",

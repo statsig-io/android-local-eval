@@ -66,6 +66,11 @@ class StatsigOptions(
      * Plugin to override SDK evaluations
      */
     @SerializedName("overrideAdapter") var overrideAdapter: IOverrideAdapter? = null,
+    /**
+     * When bootstrapping (initializeSync or initialize with initializeValues set), set this flag if you would like to use cache values if they are "fresher" then the bootstrap values
+     */
+     @SerializedName("useNewerCacheValuesOverProvidedValues") var useNewerCacheValuesOverProvidedValues: Boolean = false,
+
 ) {
 
     private var environment: MutableMap<String, String>? = null
