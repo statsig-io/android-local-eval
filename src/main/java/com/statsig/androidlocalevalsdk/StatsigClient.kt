@@ -12,10 +12,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+
+const val MIN_BG_SYNC_INTERVAL_SECONDS = 60
+const val DEFAULT_BG_SYNC_INTERVAL_SECONDS = 3600
 
 class StatsigClient {
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
@@ -34,6 +39,7 @@ class StatsigClient {
     private lateinit var sharedPrefs: SharedPreferences
     private lateinit var diagnostics: Diagnostics
 
+    private var minBackgroundSyncIntervalSeconds = MIN_BG_SYNC_INTERVAL_SECONDS
     private var pollingJob: Job? = null
     private var statsigJob = SupervisorJob()
     private var dispatcherProvider = CoroutineDispatcherProvider()
@@ -135,6 +141,24 @@ class StatsigClient {
         }, { e: Exception ->
             return@captureAsync InitializationDetails(StatsigUtils.getTimeInMillis() - initStartTime, false, InitializeResponse.FailedInitializeResponse(InitializeFailReason.InternalError, e))
         })
+    }
+
+    fun scheduleBackgroundUpdates(intervalSeconds: Int = DEFAULT_BG_SYNC_INTERVAL_SECONDS): Job? {
+        if (pollingJob != null) {
+            pollingJob?.cancel()
+        }
+        var interval = intervalSeconds
+        if (interval < minBackgroundSyncIntervalSeconds) {
+            interval = minBackgroundSyncIntervalSeconds
+            Log.e("STATSIG", "Background sync interval cannot be less than $MIN_BG_SYNC_INTERVAL_SECONDS seconds.  Defaulting to $MIN_BG_SYNC_INTERVAL_SECONDS seconds")
+        }
+        pollingJob = statsigScope.launch {
+            while (statsigScope.isActive) {
+                specStore.fetchAndSave()
+                delay(interval * 1000L)
+            }
+        }
+        return pollingJob
     }
 
 
