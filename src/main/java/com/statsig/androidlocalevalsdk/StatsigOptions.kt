@@ -79,6 +79,10 @@ class StatsigOptions(
         setEnvironmentParameter(TIER_KEY, tier.toString().lowercase())
     }
 
+    fun setTier(tier: String) {
+        setEnvironmentParameter(TIER_KEY, tier)
+    }
+
     fun setEnvironmentParameter(key: String, value: String) {
         val env = environment
         if (env == null) {

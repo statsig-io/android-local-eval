@@ -192,6 +192,33 @@ class StatsigClient {
     }
 
     /**
+     * Get the result of a gate, evaluated against a given user.
+     * An exposure event will automatically be logged for the gate.
+     *
+     * @param user A StatsigUser object used for evaluation
+     * @param gateName The name of the gate being evaluated
+     * @param options advanced setup for checkGate, for example disable exposure logging
+     */
+    @JvmOverloads
+    fun getFeatureGate(user: StatsigUser?, gateName: String, options: CheckGateOptions? = null): FeatureGate {
+        var result = FeatureGate.empty(gateName)
+        if (!isInitialized("getFeatureGate")) {
+            result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
+            return result
+        }
+        errorBoundary.capture({
+            val normalizedUser = normalizeUser(user)
+            val evaluation = evaluator.checkGate(normalizedUser, gateName, options)
+            result = getFeatureGateFromEvalResult(evaluation, gateName)
+            if (options?.disableExposureLogging !== true) {
+                logGateExposureImpl(normalizedUser, gateName, evaluation)
+            }
+        }, tag = "getFeatureGate", configName = gateName)
+        return result
+    }
+
+
+    /**
      * Log an exposure for a given gate
      * @param user A StatsigUser object used for logging
      * @param gateName the name of the gate to log an exposure for
@@ -495,6 +522,12 @@ class StatsigClient {
         if (options.getEnvironment() != null) {
             normalizedUser.statsigEnvironment = options.getEnvironment()
         }
+        if (normalizedUser.statsigEnvironment == null) {
+            val defaultEnv = specStore.getDefaultEnvironment()
+            if (defaultEnv != null) {
+                normalizedUser.statsigEnvironment = mutableMapOf("tier" to defaultEnv)
+            }
+        }
         return normalizedUser
     }
 
@@ -563,14 +596,18 @@ class StatsigClient {
     }
 
     private fun logConfigExposureImpl(user: StatsigUser, configName: String, evaluation: ConfigEvaluation, isManualExposure: Boolean = false) {
-        statsigLogger.logConfigExposure(user, configName, evaluation.ruleID, evaluation.secondaryExposures, isManualExposure, evaluation.evaluationDetails)
+        statsigLogger.logConfigExposure(user, configName, evaluation, isManualExposure)
     }
 
     private fun logGateExposureImpl(user: StatsigUser, configName: String, evaluation: ConfigEvaluation, isManualExposure: Boolean = false) {
-        statsigLogger.logGateExposure(user, configName, evaluation.booleanValue, evaluation.ruleID, evaluation.secondaryExposures, isManualExposure, evaluation.evaluationDetails)
+        statsigLogger.logGateExposure(user, configName, evaluation, isManualExposure)
     }
 
     private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, configName: String): DynamicConfig {
         return DynamicConfig(configName, result.jsonValue as? Map<String, Any> ?: mapOf(), result.ruleID, result.groupName, result.secondaryExposures, result.evaluationDetails)
+    }
+
+    private fun getFeatureGateFromEvalResult(result: ConfigEvaluation, gateName: String): FeatureGate {
+        return FeatureGate(gateName, result.booleanValue, result.ruleID, result.secondaryExposures, result.evaluationDetails)
     }
 }

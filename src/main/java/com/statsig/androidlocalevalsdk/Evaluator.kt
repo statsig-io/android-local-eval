@@ -181,6 +181,7 @@ internal class Evaluator(
                     config.defaultValue,
                     "disabled",
                     evaluationDetails = evaluationDetails,
+                    configVersion = config.version,
                 )
             }
             val secondaryExposures = arrayListOf<Map<String, String>>()
@@ -191,6 +192,7 @@ internal class Evaluator(
                 if (result.booleanValue) {
                     val delegatedEval = this.evaluateDelegate(user, rule, secondaryExposures)
                     if (delegatedEval != null) {
+                        delegatedEval.configVersion = config.version
                         return delegatedEval
                     }
                     val pass = evaluatePassPercent(user, config, rule)
@@ -202,6 +204,7 @@ internal class Evaluator(
                         secondaryExposures,
                         evaluationDetails = evaluationDetails,
                         isExperimentGroup = rule.isExperimentGroup ?: false,
+                        configVersion = config.version,
                     )
                 }
             }
@@ -212,6 +215,7 @@ internal class Evaluator(
                 null,
                 secondaryExposures,
                 evaluationDetails = evaluationDetails,
+                configVersion = config.version,
             )
         } catch (e: UnsupportedEvaluationException) {
             // Return default value for unsupported evaluation
@@ -222,6 +226,7 @@ internal class Evaluator(
                 ruleID = "default",
                 explicitParameters = config.explicitParameters ?: arrayOf(),
                 evaluationDetails = EvaluationDetails(configSyncTime = specStore.lcut, reason = EvaluationReason.UNSUPPORTED),
+                configVersion = config.version,
             )
         }
     }

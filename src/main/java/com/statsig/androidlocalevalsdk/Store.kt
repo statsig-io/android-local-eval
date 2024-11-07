@@ -30,6 +30,7 @@ internal class Store(
     private var layerConfigs: Map<String, APIConfig> = emptyMap()
     private var experimentToLayer: Map<String, String> = emptyMap()
     private var cacheByKey: MutableMap<String, String> = mutableMapOf()
+    private var defaultEnvironment: String? = null
 
     fun getGate(name: String): APIConfig? {
         return this.gates[name]
@@ -41,6 +42,10 @@ internal class Store(
 
     fun getLayerConfig(name: String): APIConfig? {
         return this.layerConfigs[name]
+    }
+
+    fun getDefaultEnvironment(): String? {
+        return this.defaultEnvironment
     }
 
     fun syncLoadFromLocalStorage() {
@@ -145,6 +150,7 @@ internal class Store(
         this.layerConfigs = newLayerConfigs
         this.experimentToLayer = newExperimentToLayer
         this.lcut = configSpecs.time
+        this.defaultEnvironment = configSpecs.defaultEnvironment
     }
 
     private fun getParsedSpecs(values: Array<APIConfig>): Map<String, APIConfig> {

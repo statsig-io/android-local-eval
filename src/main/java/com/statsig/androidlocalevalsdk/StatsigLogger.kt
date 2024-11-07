@@ -70,26 +70,27 @@ internal class StatsigLogger(
     fun logGateExposure(
         user: StatsigUser,
         gateName: String,
-        value: Boolean,
-        ruleID: String,
-        secondaryExposures: ArrayList<Map<String, String>>,
+        evaluation: ConfigEvaluation,
         isManualExposure: Boolean = false,
-        evaluationDetails: EvaluationDetails?,
     ) {
-        val dedupeKey = "$gateName:$ruleID:${evaluationDetails?.reason}"
+        val dedupeKey = "$gateName:$evaluation.ruleID:${evaluation.evaluationDetails?.reason}"
         if (!shouldLogExposure(user, dedupeKey)) {
             return
         }
         coroutineScope.launch(singleThreadDispatcher) {
             val metadata = mutableMapOf(
                 "gate" to gateName,
-                "gateValue" to value.toString(),
-                "ruleID" to ruleID,
+                "gateValue" to evaluation.booleanValue.toString(),
+                "ruleID" to evaluation.ruleID,
                 "isManualExposure" to isManualExposure.toString(),
             )
-            if (evaluationDetails != null) {
-                metadata["reason"] = evaluationDetails.reason.reason
-                metadata["time"] = evaluationDetails.configSyncTime.toString()
+            val evalDetails = evaluation.evaluationDetails
+            if (evalDetails != null) {
+                metadata["reason"] = evalDetails.reason.reason
+                metadata["time"] = evalDetails.configSyncTime.toString()
+            }
+            if (evaluation.configVersion != null) {
+                metadata["configVersion"] = evaluation.configVersion.toString()
             }
             val event = LogEvent(
                 GATE_EXPOSURE_EVENT,
@@ -97,7 +98,7 @@ internal class StatsigLogger(
                 metadata,
                 user,
                 statsigMetadata,
-                secondaryExposures,
+                evaluation.secondaryExposures,
             )
             log(event)
         }
@@ -106,21 +107,23 @@ internal class StatsigLogger(
     fun logConfigExposure(
         user: StatsigUser,
         configName: String,
-        ruleID: String,
-        secondaryExposures: ArrayList<Map<String, String>>,
+        evaluation: ConfigEvaluation,
         isManualExposure: Boolean,
-        evaluationDetails: EvaluationDetails?,
     ) {
-        val dedupeKey = "$configName:$ruleID:${evaluationDetails?.reason}"
+        val dedupeKey = "$configName:$evaluation.ruleID:${evaluation.evaluationDetails?.reason}"
         if (!shouldLogExposure(user, dedupeKey)) {
             return
         }
         coroutineScope.launch(singleThreadDispatcher) {
             val metadata =
-                mutableMapOf("config" to configName, "ruleID" to ruleID, "isManualExposure" to isManualExposure.toString())
-            if (evaluationDetails != null) {
-                metadata["reason"] = evaluationDetails.reason.reason
-                metadata["time"] = evaluationDetails.configSyncTime.toString()
+                mutableMapOf("config" to configName, "ruleID" to evaluation.ruleID, "isManualExposure" to isManualExposure.toString(), "rulePassed" to evaluation.booleanValue.toString())
+            val evalDetails = evaluation.evaluationDetails
+            if (evalDetails != null) {
+                metadata["reason"] = evalDetails.reason.reason
+                metadata["time"] = evalDetails.configSyncTime.toString()
+            }
+            if (evaluation.configVersion != null) {
+                metadata["configVersion"] = evaluation.configVersion.toString()
             }
             val event = LogEvent(
                 CONFIG_EXPOSURE_EVENT,
@@ -128,7 +131,7 @@ internal class StatsigLogger(
                 metadata,
                 user,
                 statsigMetadata,
-                secondaryExposures,
+                evaluation.secondaryExposures,
             )
             log(event)
         }

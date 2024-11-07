@@ -12,6 +12,7 @@ internal class ConfigEvaluation(
     val configDelegate: String? = null,
     var evaluationDetails: EvaluationDetails? = null,
     var isExperimentGroup: Boolean = false,
+    var configVersion: Int? = null,
 ) {
     var undelegatedSecondaryExposures: ArrayList<Map<String, String>> = secondaryExposures
 
