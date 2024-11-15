@@ -18,11 +18,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import com.statsig.androidlocalevalsdk.typed.TypedStatsigProvider
 
 const val MIN_BG_SYNC_INTERVAL_SECONDS = 60
 const val DEFAULT_BG_SYNC_INTERVAL_SECONDS = 3600
 
 class StatsigClient {
+    val typed: TypedStatsigProvider
+        get() = typedProvider
+
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
     private lateinit var options: StatsigOptions
 
@@ -47,6 +51,7 @@ class StatsigClient {
     private var initialized = AtomicBoolean(false)
     private var isBootstrapped = AtomicBoolean(false)
     private var globalUser: StatsigUser? = null
+    private var typedProvider = TypedStatsigProvider()
 
     /**
      * Initializes the SDK for the given user
@@ -96,6 +101,7 @@ class StatsigClient {
         if (this@StatsigClient.isInitialized()) {
             return
         }
+
         errorBoundary.capture({
             setup(application, sdkKey, options)
             statsigScope.launch {
@@ -119,6 +125,7 @@ class StatsigClient {
         if (this@StatsigClient.isInitialized()) {
             return InitializationDetails(0, true)
         }
+
         val initStartTime = System.currentTimeMillis()
         return errorBoundary.capture({
                 options.initializeValues = initialSpecs
@@ -471,6 +478,7 @@ class StatsigClient {
         errorBoundary.setMetadata(statsigMetadata)
         specStore = Store(sdkKey, statsigNetwork, statsigScope, sharedPrefs, errorBoundary, diagnostics)
         evaluator = Evaluator(specStore, errorBoundary, persistentStorage, options.overrideAdapter)
+        typedProvider.bind(this, options)
 
         // load cache
         if (!options.loadCacheAsync || options.useNewerCacheValuesOverProvidedValues) {
@@ -493,14 +501,16 @@ class StatsigClient {
                 statsigScope.launch {
                     statsigLogger.retryFailedLog(sharedPrefs)
                 }
+
                 if (this@StatsigClient.isBootstrapped.get()) {
                     diagnostics.markEnd(KeyType.OVERALL, true)
                     return@captureAsync InitializationDetails(System.currentTimeMillis() - initStartTime, true, null)
                 }
-                // load cache
+
                 if (options.loadCacheAsync) {
                     specStore.syncLoadFromLocalStorage()
                 }
+
                 val initializeDetail = specStore.fetchAndSave()
                 initializeDetail.duration = StatsigUtils.getTimeInMillis() - initStartTime
                 diagnostics.markEnd(KeyType.OVERALL, initializeDetail.success, additionalMarker = Marker(evaluationDetails = specStore.getEvaluationDetailsForLogging()))
