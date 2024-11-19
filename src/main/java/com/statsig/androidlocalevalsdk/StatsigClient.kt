@@ -27,11 +27,13 @@ class StatsigClient {
     val typed: TypedStatsigProvider
         get() = typedProvider
 
+    internal var globalUser: StatsigUser? = null
     internal var errorBoundary: ErrorBoundary = ErrorBoundary()
-    private lateinit var options: StatsigOptions
 
     @VisibleForTesting
     internal lateinit var statsigNetwork: StatsigNetwork
+
+    private lateinit var options: StatsigOptions
     private lateinit var evaluator: Evaluator
     private lateinit var statsigLogger: StatsigLogger
     private lateinit var application: Application
@@ -50,7 +52,6 @@ class StatsigClient {
     private var persistentStorage: StatsigUserPersistenStorageHelper? = null
     private var initialized = AtomicBoolean(false)
     private var isBootstrapped = AtomicBoolean(false)
-    private var globalUser: StatsigUser? = null
     private var typedProvider = TypedStatsigProvider()
 
     /**

@@ -2,7 +2,6 @@ package com.statsig.androidlocalevalsdk
 
 import android.app.Application
 import com.statsig.androidlocalevalsdk.typed.TypedExperiment
-import com.statsig.androidlocalevalsdk.typed.TypedGroupName
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -13,25 +12,36 @@ import org.junit.Test
 import java.io.File
 
 @Suppress("EnumEntryName")
-enum class TestExpGroup: TypedGroupName {
+enum class TestExpGroup {
     Control, Test, `Test #2`
 }
-class TestExperiment : TypedExperiment<TestExpGroup>("experiment_with_many_params", TestExpGroup.values()) {
+
+class TestExperiment :
+    TypedExperiment<TestExpGroup>("experiment_with_many_params", TestExpGroup.values()) {
 
 }
 
-class TestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>("test_exp_5050_targeting", MemoGroup.values(), isMemoizable = true) {
-    enum class MemoGroup: TypedGroupName {
+class TestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>(
+    "test_exp_5050_targeting",
+    MemoGroup.values(),
+    isMemoizable = true
+) {
+    enum class MemoGroup {
         Control, Test
     }
 }
 
-class SameTestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>("test_exp_5050_targeting", TestMemoExperiment.MemoGroup.values(), isMemoizable = true) {
+class SameTestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>(
+    "test_exp_5050_targeting",
+    TestMemoExperiment.MemoGroup.values(),
+    isMemoizable = true
+)
 
-}
-
-class TestBadGroupExperiment : TypedExperiment<TestBadGroupExperiment.BadGroup>("experiment_with_many_params", BadGroup.values()) {
-    enum class BadGroup: TypedGroupName {
+class TestBadGroupExperiment : TypedExperiment<TestBadGroupExperiment.BadGroup>(
+    "experiment_with_many_params",
+    BadGroup.values()
+) {
+    enum class BadGroup {
         Error, Bad
     }
 }
@@ -48,7 +58,8 @@ class StatsigTypedTest {
         TestUtil.stubAppFunctions(app)
         TestUtil.mockStatsigUtils()
 
-        val dcs = File("src/test/java/com/statsig/androidlocalevalsdk/eval_proj_dcs.json").readText()
+        val dcs =
+            File("src/test/java/com/statsig/androidlocalevalsdk/eval_proj_dcs.json").readText()
 
         client = StatsigClient()
         client.initializeSync(app, "client-key", dcs)
@@ -65,12 +76,15 @@ class StatsigTypedTest {
             TestExpGroup.Control -> {
                 assertTrue(false)
             }
+
             TestExpGroup.Test -> {
                 assertTrue(true)
             }
+
             TestExpGroup.`Test #2` -> {
                 assertTrue(false)
             }
+
             else -> assertTrue(false)
         }
     }
@@ -83,6 +97,8 @@ class StatsigTypedTest {
 
     @Test
     fun testMemoizedExperiments() {
+        client.typed.memo.reset()
+
         val first = TestMemoExperiment()
         val exp1 = client.typed.getExperiment(first, user)
 
@@ -95,6 +111,8 @@ class StatsigTypedTest {
 
     @Test
     fun testBadMemoConfiguration() {
+        client.typed.memo.reset()
+
         val first = TestMemoExperiment()
         val exp1 = client.typed.getExperiment(first, user)
 
@@ -110,5 +128,15 @@ class StatsigTypedTest {
         val exp = client.typed.getExperiment(TestBadGroupExperiment(), user)
         assertNotNull(exp)
         assertNull(exp.group)
+    }
+
+    @Test
+    fun testGlobalUser() {
+        client.typed.memo.reset()
+
+        client.setGlobalUser(StatsigUser("global-user-in-control"))
+        val exp = client.typed.getExperiment(TestMemoExperiment())
+
+        assertEquals(TestMemoExperiment.MemoGroup.Control, exp.group)
     }
 }

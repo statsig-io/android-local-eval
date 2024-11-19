@@ -1,13 +1,11 @@
 package com.statsig.androidlocalevalsdk.typed
 
-interface TypedGroupName {}
-
 abstract class TypedExperiment<T>(
     val name: String,
-    val groups: Array<T>,
+    private val groups: Array<T>,
     val isMemoizable: Boolean = false,
     val memoUnitIdType: String = "userID"
-) where T : Enum<T>, T : TypedGroupName {
+) where T : Enum<T> {
     val group: T?
         get() = _group
 
