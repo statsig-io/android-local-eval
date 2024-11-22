@@ -46,7 +46,7 @@ internal class StatsigLogger(
         }
     }
 
-    private suspend fun flush() {
+    internal suspend fun flush() {
         withContext(singleThreadDispatcher) {
             addDiagnosticEvents(ContextType.API_CALL)
             if (events.size == 0) {

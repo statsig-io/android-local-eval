@@ -1,10 +1,10 @@
 package com.statsig.androidlocalevalsdk
 
 class EvaluationDetails(
-    var configSyncTime: Long,
-    var reason: EvaluationReason,
+    val configSyncTime: Long,
+    val reason: EvaluationReason,
 ) {
-    var serverTime: Long = StatsigUtils.getTimeInMillis()
+    val serverTime: Long = StatsigUtils.getTimeInMillis()
 
     fun toMap(): Map<String, String> {
         return mapOf(

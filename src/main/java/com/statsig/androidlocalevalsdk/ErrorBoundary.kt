@@ -81,6 +81,15 @@ internal class ErrorBoundary() {
         }
     }
 
+    suspend fun <T> captureAsync(task: suspend () -> T, tag: String): T? {
+        return try {
+            task()
+        } catch (e: Exception) {
+            handleException(e, tag)
+            null
+        }
+    }
+
     suspend fun <T> captureAsync(task: suspend () -> T, recover: (suspend (e: Exception) -> T), tag: String? = null): T {
         return try {
             task()

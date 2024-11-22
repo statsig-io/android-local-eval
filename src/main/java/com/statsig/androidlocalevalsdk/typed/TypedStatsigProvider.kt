@@ -2,8 +2,10 @@ package com.statsig.androidlocalevalsdk.typed
 
 import TypedGateName
 import android.util.Log
+import com.statsig.androidlocalevalsdk.CheckGateOptions
 import com.statsig.androidlocalevalsdk.EvaluatorUtils
 import com.statsig.androidlocalevalsdk.FeatureGate
+import com.statsig.androidlocalevalsdk.GetExperimentOptions
 import com.statsig.androidlocalevalsdk.StatsigClient
 import com.statsig.androidlocalevalsdk.StatsigOptions
 import com.statsig.androidlocalevalsdk.StatsigUser
@@ -30,14 +32,16 @@ open class TypedStatsigProvider {
 
     open fun checkGate(
         name: TypedGateName,
-        user: StatsigUser? = null
+        user: StatsigUser? = null,
+        options: CheckGateOptions? = null
     ): Boolean {
-        return getFeatureGate(name, user).value
+        return getFeatureGate(name, user, options).value
     }
 
     open fun getFeatureGate(
         name: TypedGateName,
-        user: StatsigUser? = null
+        user: StatsigUser? = null,
+        options: CheckGateOptions? = null
     ): FeatureGate {
         val (client, validatedUser) = validate(user) ?: return FeatureGate.empty(name.value)
 
@@ -46,13 +50,14 @@ open class TypedStatsigProvider {
             return found
         }
 
-        val gate = client.getFeatureGate(validatedUser, name.value)
+        val gate = client.getFeatureGate(validatedUser, name.value, options)
         return tryMemoizeFeatureGate(name, gate, validatedUser)
     }
 
     open fun <T> getExperiment(
         experiment: T,
-        user: StatsigUser? = null
+        user: StatsigUser? = null,
+        options: GetExperimentOptions? = null
     ): T where T : AnyExperiment {
         val (client, validatedUser) = validate(user) ?: return experiment
 
@@ -61,8 +66,7 @@ open class TypedStatsigProvider {
             return found
         }
 
-        val rawExperiment = client.getExperiment(validatedUser, experiment.name)
-
+        val rawExperiment = client.getExperiment(validatedUser, experiment.name, options)
         experiment.trySetGroupFromString(rawExperiment.groupName)
 
         if (experiment.group == null && rawExperiment.groupName != null) {
@@ -79,6 +83,11 @@ open class TypedStatsigProvider {
     open fun bind(client: StatsigClient, options: StatsigOptions) {
         this.client = client
     }
+
+
+    /**
+     * Private
+     */
 
     private fun validate(optUser: StatsigUser?): Pair<StatsigClient, StatsigUser>? {
         val client = this.client ?: run {

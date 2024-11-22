@@ -7,6 +7,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.Assert.assertEquals
+
 
 class DiagnosticsTest {
     lateinit var client: StatsigClient
@@ -37,29 +39,30 @@ class DiagnosticsTest {
     fun testConcurrency() = runBlocking {
         client.initialize(app, "client-key")
         forceDiagnosticsOnErrorBoundary()
+
         val threads = arrayListOf<Thread>()
         val threadSize = 3
         val iterations = 4
         for (i in 1..threadSize) {
-            val t =
-                Thread {
-                    for (j in 1..iterations) {
-                        runBlocking {
-                            client.checkGate(user1, "always_on_gate")
-                        }
-                    }
+            threads.add(Thread {
+                for (j in 1..iterations) {
+                    client.checkGate(user1, "always_on_gate")
                 }
-            threads.add(t)
+            })
         }
+
         for (t in threads) {
             t.start()
         }
+
         for (t in threads) {
             t.join()
         }
-        client.shutdown()
+
+        client.flushEvents()
+
         val markers = parseMarkers(ContextType.API_CALL)
-        assert(markers.size == threadSize * iterations * 2)
+        assertEquals(threadSize * iterations * 2, markers.size)
     }
 
     @Test

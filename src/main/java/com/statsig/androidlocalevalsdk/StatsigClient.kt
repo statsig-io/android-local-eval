@@ -151,22 +151,35 @@ class StatsigClient {
         })
     }
 
+    suspend fun flushEvents() {
+        errorBoundary.captureAsync({
+                statsigLogger.flush()
+            },
+            "flushEvents"
+        )
+    }
+
     fun scheduleBackgroundUpdates(intervalSeconds: Int = DEFAULT_BG_SYNC_INTERVAL_SECONDS): Job? {
-        if (pollingJob != null) {
-            pollingJob?.cancel()
-        }
-        var interval = intervalSeconds
-        if (interval < minBackgroundSyncIntervalSeconds) {
-            interval = minBackgroundSyncIntervalSeconds
-            Log.e("STATSIG", "Background sync interval cannot be less than $MIN_BG_SYNC_INTERVAL_SECONDS seconds.  Defaulting to $MIN_BG_SYNC_INTERVAL_SECONDS seconds")
-        }
-        pollingJob = statsigScope.launch {
-            while (statsigScope.isActive) {
-                specStore.fetchAndSave()
-                delay(interval * 1000L)
+        return errorBoundary.capture({
+            if (pollingJob != null) {
+                pollingJob?.cancel()
             }
-        }
-        return pollingJob
+
+            var interval = intervalSeconds
+            if (interval < minBackgroundSyncIntervalSeconds) {
+                interval = minBackgroundSyncIntervalSeconds
+                Log.e("STATSIG", "Background sync interval cannot be less than $MIN_BG_SYNC_INTERVAL_SECONDS seconds.  Defaulting to $MIN_BG_SYNC_INTERVAL_SECONDS seconds")
+            }
+
+            pollingJob = statsigScope.launch {
+                while (statsigScope.isActive) {
+                    specStore.fetchAndSave()
+                    delay(interval * 1000L)
+                }
+            }
+
+            return@capture pollingJob
+        }, tag = "checkGate")
     }
 
 
