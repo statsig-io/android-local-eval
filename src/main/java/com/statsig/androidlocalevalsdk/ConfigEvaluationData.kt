@@ -5,6 +5,7 @@ import com.google.gson.annotations.SerializedName
 internal class ConfigEvaluation(
     val booleanValue: Boolean = false,
     val jsonValue: Any? = null,
+    val returnableValue: ReturnableValue? = null,
     val ruleID: String = "",
     val groupName: String? = null,
     val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
@@ -74,7 +75,7 @@ internal class PersistedValueConfig(
 ) {
     fun toConfigEvaluationData(): ConfigEvaluation {
         val evalDetail = EvaluationDetails(this.time ?: StatsigUtils.getTimeInMillis(), EvaluationReason.PERSISTED)
-        var evaluation = ConfigEvaluation(
+        val evaluation = ConfigEvaluation(
             jsonValue = this.jsonValue,
             booleanValue = this.value,
             ruleID = this.ruleID,

@@ -190,7 +190,8 @@ internal class StatsigNetwork(
                     } else {
                         connection.errorStream
                     }
-                    var errorMarker = if (code >= HttpURLConnection.HTTP_BAD_REQUEST) {
+
+                    val errorMarker = if (code >= HttpURLConnection.HTTP_BAD_REQUEST) {
                         val errorMessage = inputStream.bufferedReader(Charsets.UTF_8).use(
                             BufferedReader::readText,
                         )
@@ -198,6 +199,7 @@ internal class StatsigNetwork(
                     } else {
                         null
                     }
+
                     diagnostics.markEnd(
                         KeyType.DOWNLOAD_CONFIG_SPECS,
                         code < HttpURLConnection.HTTP_BAD_REQUEST,
@@ -210,6 +212,7 @@ internal class StatsigNetwork(
                             hasNetwork = connectivityListener.isNetworkAvailable(),
                         ),
                     )
+
                     when (code) {
                         in 200..299 -> {
                             if (code == 204) {

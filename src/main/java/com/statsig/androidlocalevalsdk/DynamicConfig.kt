@@ -10,10 +10,11 @@ class DynamicConfig(
     val groupName: String? = null,
     val secondaryExposures: ArrayList<Map<String, String>> = arrayListOf(),
     var evaluationDetails: EvaluationDetails? = null,
+    val rawValue: String? = null,
 ) {
     companion object {
         fun empty(name: String = ""): DynamicConfig {
-            return DynamicConfig(name, mapOf())
+            return DynamicConfig(name, mapOf(), "{}")
         }
     }
 

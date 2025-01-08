@@ -12,7 +12,7 @@ class DynamicConfigTest {
 
     @Before
     fun setup() {
-        config = DynamicConfig("a_config", TestUtil.getConfigTestValues())
+        config = DynamicConfig("a_config", TestUtil.getConfigTestValues(), TestUtil.getRawConfigTestValues())
     }
 
     @Test

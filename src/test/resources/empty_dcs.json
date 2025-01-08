@@ -1,0 +1,14 @@
+{
+  "dynamic_configs": [],
+  "feature_gates": [],
+  "layers": {},
+  "layer_configs": [],
+  "has_updates": true,
+  "time": 1731526366687,
+  "company_id": "5NprLGRxV3W28hreG51Z7n",
+  "response_format": "dcs-v1",
+  "id_lists": {},
+  "diagnostics": {},
+  "sdk_flags": {},
+  "sdk_configs": {}
+}

@@ -1,7 +1,9 @@
 package com.statsig.androidlocalevalsdk
 
 import android.app.Application
+import com.google.gson.annotations.SerializedName
 import com.statsig.androidlocalevalsdk.typed.TypedExperiment
+import com.statsig.androidlocalevalsdk.typed.TypedExperimentWithoutValue
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -18,11 +20,11 @@ enum class TestExpGroup {
 }
 
 class TestExperiment :
-    TypedExperiment<TestExpGroup>("experiment_with_many_params", TestExpGroup.values()) {
+    TypedExperimentWithoutValue<TestExpGroup>(
+        "experiment_with_many_params", TestExpGroup.values()
+    )
 
-}
-
-class TestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>(
+class TestMemoExperiment : TypedExperimentWithoutValue<TestMemoExperiment.MemoGroup>(
     "test_exp_5050_targeting",
     MemoGroup.values(),
     isMemoizable = true
@@ -32,13 +34,13 @@ class TestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>(
     }
 }
 
-class SameTestMemoExperiment : TypedExperiment<TestMemoExperiment.MemoGroup>(
+class SameTestMemoExperiment : TypedExperimentWithoutValue<TestMemoExperiment.MemoGroup>(
     "test_exp_5050_targeting",
     TestMemoExperiment.MemoGroup.values(),
     isMemoizable = true
 )
 
-class TestBadGroupExperiment : TypedExperiment<TestBadGroupExperiment.BadGroup>(
+class TestBadGroupExperiment : TypedExperimentWithoutValue<TestBadGroupExperiment.BadGroup>(
     "experiment_with_many_params",
     BadGroup.values()
 ) {
@@ -47,7 +49,34 @@ class TestBadGroupExperiment : TypedExperiment<TestBadGroupExperiment.BadGroup>(
     }
 }
 
-class StatsigTypedTest {
+data class TestExpValue(
+    @SerializedName("a_string") val aString: String,
+    @SerializedName("another_string") val anotherString: String,
+    @SerializedName("a_number") val aNumber: Double,
+    @SerializedName("a_bool") val aBool: Boolean,
+    @SerializedName("an_object") val anObject: Map<String, Any>,
+    @SerializedName("an_array") val anArray: List<Any>,
+    @SerializedName("another_bool") val anotherBool: Boolean,
+    @SerializedName("another_number") val anotherNumber: Double,
+)
+
+class TestExperimentWithValue: TypedExperiment<TestExpGroup, TestExpValue>(
+    "experiment_with_many_params", TestExpGroup.values(), valueClass = TestExpValue::class.java
+)
+
+data class TestExpBadValue(
+    @SerializedName("invalid_entry") val invalidEntry: String,
+)
+
+class TestExperimentWithBadValue: TypedExperiment<TestExpGroup, TestExpBadValue>(
+    "experiment_with_many_params", TestExpGroup.values(), valueClass = TestExpBadValue::class.java
+)
+
+val myExperimentDefinition = TypedExperiment(
+    "experiment_with_many_params", TestExpGroup.values(), valueClass = TestExpValue::class.java
+)
+
+class StatsigTypedExperimentsTest {
     private lateinit var app: Application
     private lateinit var client: StatsigClient
     private lateinit var user: StatsigUser
@@ -63,10 +92,10 @@ class StatsigTypedTest {
 
         network = TestUtil.mockNetwork(onLog = {
             events.addAll(it)
-        })
+        }, configSpecs = TestUtil.getAPIDownloadConfigSpec("/empty_dcs.json"))
 
         val dcs =
-            File("src/test/java/com/statsig/androidlocalevalsdk/eval_proj_dcs.json").readText()
+            File("src/test/resources/eval_proj_dcs.json").readText()
 
         client = StatsigClient()
         client.statsigNetwork = network
@@ -109,17 +138,18 @@ class StatsigTypedTest {
     }
 
     @Test
-    fun testMemoizedExperiments() {
+    fun testMemoizedExperiments() = runBlocking {
         client.typed.memo.reset()
 
         val first = TestMemoExperiment()
         val exp1 = client.typed.getExperiment(first, user)
+        assertEquals(TestMemoExperiment.MemoGroup.Test, exp1.group)
+
+        client.updateAsync()
 
         val second = TestMemoExperiment()
         val exp2 = client.typed.getExperiment(second, user)
-
-        assertTrue(exp1 === exp2)
-        assertTrue(first !== second)
+        assertEquals(TestMemoExperiment.MemoGroup.Test, exp2.group)
     }
 
     @Test
@@ -173,5 +203,66 @@ class StatsigTypedTest {
         client.flushEvents()
 
         assertEquals(0, events.size)
+    }
+
+    @Test
+    fun testValueDeserialization() = runBlocking {
+        val exp = client.typed.getExperiment(TestExperimentWithValue(), user)
+        assertEquals("test_1", exp.value?.aString)
+        assertEquals("layer_default", exp.value?.anotherString)
+
+        assertEquals(false, exp.value?.aBool)
+        assertEquals(false, exp.value?.anotherBool)
+
+        assertEquals(2.0, exp.value?.aNumber)
+        assertEquals(2.0, exp.value?.anotherNumber)
+
+        assertEquals(1, exp.value?.anArray?.size)
+        assertEquals("test_1", exp.value?.anArray?.first())
+
+        assertEquals(1, exp.value?.anObject?.size)
+        assertEquals("layer_default", exp.value?.anObject?.get("value"))
+    }
+
+    @Test
+    fun testValueInvalidDeserialization() = runBlocking {
+        val exp = client.typed.getExperiment(TestExperimentWithBadValue(), user)
+        assertNull(exp.value?.invalidEntry)
+    }
+
+    @Test
+    fun testReusingExperimentDefinitions() = runBlocking {
+        val one = client.typed.getExperiment(myExperimentDefinition, user)
+        assertEquals("test_1", one.value?.aString)
+
+        val two = client.typed.getExperiment(myExperimentDefinition, StatsigUser("user-in-test-2"))
+
+        assertEquals("test_1", one.value?.aString)
+        assertEquals("test_2", two.value?.aString)
+    }
+
+    @Test
+    fun testReturnsClonedInstances() = runBlocking {
+        val one = client.typed.getExperiment(myExperimentDefinition, user)
+        val two = client.typed.getExperiment(myExperimentDefinition, user)
+
+        println(one.value?.aString)
+        assert(one !== myExperimentDefinition)
+        assert(one !== two)
+    }
+
+    @Test
+    fun testMemoReturnsClonedInstances() = runBlocking {
+        client.typed.memo.reset()
+
+        val def = TestMemoExperiment()
+        val one = client.typed.getExperiment(def, user)
+        val two = client.typed.getExperiment(def, user)
+
+        assert(one !== def)
+        assert(one !== two)
+
+        assertEquals(TestMemoExperiment.MemoGroup.Test, one.group)
+        assertEquals(TestMemoExperiment.MemoGroup.Test, two.group)
     }
 }

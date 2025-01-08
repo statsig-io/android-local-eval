@@ -9,11 +9,12 @@ import com.statsig.androidlocalevalsdk.GetExperimentOptions
 import com.statsig.androidlocalevalsdk.StatsigClient
 import com.statsig.androidlocalevalsdk.StatsigOptions
 import com.statsig.androidlocalevalsdk.StatsigUser
+import com.statsig.androidlocalevalsdk.StatsigUtils
 
-typealias AnyExperiment = TypedExperiment<*>
+typealias AnyTypedExperiment = TypedExperiment<*, *>
 
 internal class MemoStore {
-    var experiments = mutableMapOf<String, AnyExperiment>()
+    var experiments = mutableMapOf<String, AnyTypedExperiment>()
     var gates = mutableMapOf<String, FeatureGate>()
 
     fun reset() {
@@ -29,6 +30,7 @@ open class TypedStatsigProvider {
 
     var client: StatsigClient? = null
     internal var memo = MemoStore()
+    internal var gson = StatsigUtils.getGson(serializeNulls = true)
 
     open fun checkGate(
         name: TypedGateName,
@@ -58,26 +60,37 @@ open class TypedStatsigProvider {
         experiment: T,
         user: StatsigUser? = null,
         options: GetExperimentOptions? = null
-    ): T where T : AnyExperiment {
-        val (client, validatedUser) = validate(user) ?: return experiment
-
-        val found = tryGetMemoExperiment(experiment, validatedUser)
-        if (found != null) {
-            return found
-        }
-
-        val rawExperiment = client.getExperiment(validatedUser, experiment.name, options)
-        experiment.trySetGroupFromString(rawExperiment.groupName)
-
-        if (experiment.group == null && rawExperiment.groupName != null) {
-            Log.e(
-                TAG,
-                "Error: Failed to convert group name: ${rawExperiment.groupName} to enum for experiment ${experiment.name}"
-            )
+    ): T where T : AnyTypedExperiment {
+        val name = experiment.name
+        val result: T = experiment.new() ?: run {
+            Log.e(TAG, "Failed to create a new instance of experiment $name")
             return experiment
         }
 
-        return tryMemoizeExperiment(experiment, validatedUser)
+        val (client, validatedUser) = validate(user) ?: return result
+
+        val found = tryGetMemoExperiment(result, validatedUser)
+        if (found != null) {
+            return found.clone() ?: run {
+                Log.e(TAG, "Failed to clone memoized instance of experiment $name")
+                result
+            }
+        }
+
+        val rawExperiment = client.getExperiment(validatedUser, result.name, options)
+        val rawGroup = rawExperiment.groupName
+        result.trySetGroupFromString(rawGroup)
+        result.trySetValueFromString(gson, rawExperiment.rawValue)
+
+        if (result.group == null && rawGroup != null) {
+            Log.e(TAG, "Failed to convert group name: $rawGroup to enum for experiment $name")
+        }
+
+        if (result.value == null && rawGroup != null && experiment.valueClass != null) {
+            Log.e(TAG, "Failed to convert group name: $rawGroup to enum for experiment $name")
+        }
+
+        return tryMemoizeExperiment(result, validatedUser)
     }
 
     open fun bind(client: StatsigClient, options: StatsigOptions) {
@@ -104,7 +117,10 @@ open class TypedStatsigProvider {
         return Pair(client, user)
     }
 
-    private fun <T : AnyExperiment> tryGetMemoExperiment(experiment: T, user: StatsigUser): T? {
+    private fun <T : AnyTypedExperiment> tryGetMemoExperiment(
+        experiment: T,
+        user: StatsigUser
+    ): T? {
         if (!experiment.isMemoizable) {
             return null
         }
@@ -120,7 +136,7 @@ open class TypedStatsigProvider {
         return found as? T
     }
 
-    private fun <T : AnyExperiment> tryMemoizeExperiment(experiment: T, user: StatsigUser): T {
+    private fun <T : AnyTypedExperiment> tryMemoizeExperiment(experiment: T, user: StatsigUser): T {
         if (!experiment.isMemoizable) {
             return experiment
         }
@@ -142,7 +158,11 @@ open class TypedStatsigProvider {
         return memo.gates[key]
     }
 
-    private fun tryMemoizeFeatureGate(name: TypedGateName, gate: FeatureGate, user: StatsigUser): FeatureGate {
+    private fun tryMemoizeFeatureGate(
+        name: TypedGateName,
+        gate: FeatureGate,
+        user: StatsigUser
+    ): FeatureGate {
         if (!name.isMemoizable) {
             return gate
         }

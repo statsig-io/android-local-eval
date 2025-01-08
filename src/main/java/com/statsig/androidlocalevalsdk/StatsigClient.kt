@@ -265,18 +265,22 @@ class StatsigClient {
     @JvmOverloads
     fun getExperiment(user: StatsigUser?, experimentName: String, option: GetExperimentOptions? = null): DynamicConfig {
         var result = DynamicConfig.empty()
+
         if (!isInitialized("getExperiment")) {
             result.evaluationDetails = EvaluationDetails(0, EvaluationReason.UNINITIALIZED)
             return result
         }
+
         errorBoundary.capture({
             val normalizedUser = normalizeUser(user)
             val evaluation = evaluator.getExperiment(normalizedUser, experimentName, option)
             result = getDynamicConfigFromEvalResult(evaluation, experimentName)
+
             if (option?.disableExposureLogging !== true) {
                 logConfigExposureImpl(normalizedUser, experimentName, evaluation)
             }
         }, tag = "getExperiment", configName = experimentName)
+
         return result
     }
 
@@ -628,7 +632,15 @@ class StatsigClient {
     }
 
     private fun getDynamicConfigFromEvalResult(result: ConfigEvaluation, configName: String): DynamicConfig {
-        return DynamicConfig(configName, result.jsonValue as? Map<String, Any> ?: mapOf(), result.ruleID, result.groupName, result.secondaryExposures, result.evaluationDetails)
+        return DynamicConfig(
+            configName,
+            result.jsonValue as? Map<String, Any> ?: mapOf(),
+            result.ruleID,
+            result.groupName,
+            result.secondaryExposures,
+            result.evaluationDetails,
+            result.returnableValue?.rawJson ?: "{}",
+        )
     }
 
     private fun getFeatureGateFromEvalResult(result: ConfigEvaluation, gateName: String): FeatureGate {

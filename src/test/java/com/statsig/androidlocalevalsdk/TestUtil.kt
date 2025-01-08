@@ -25,7 +25,7 @@ private const val TEST_TIMEOUT = 10L
 
 class TestUtil {
     companion object {
-        fun getConfigTestValues(): Map<String, Any> {
+        fun getRawConfigTestValues(): String {
             val string = """
             {
                 "name": "",
@@ -53,13 +53,18 @@ class TestUtil {
                 }
             }
             """.trimIndent()
+            return string
+        }
+
+        fun getConfigTestValues(): Map<String, Any> {
+            val string = getRawConfigTestValues()
 
             val obj = GsonBuilder()
                 .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
                 .create()
                 .fromJson(string, APIRule::class.java)
 
-            return obj.returnValue as Map<String, Any>
+            return obj.returnValue.getValue() as Map<String, Any>
         }
 
         fun getMockApp(): Application {

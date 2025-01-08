@@ -15,7 +15,7 @@ import java.util.concurrent.CountDownLatch;
 
 import kotlin.coroutines.Continuation;
 
-public class PersistenStorageTest {
+public class PersistentStorageTest {
     private Application app;
     private StatsigClient client;
     private StatsigUser user;

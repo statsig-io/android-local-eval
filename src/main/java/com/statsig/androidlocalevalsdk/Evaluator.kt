@@ -178,6 +178,7 @@ internal class Evaluator(
             if (!config.enabled) {
                 return ConfigEvaluation(
                     booleanValue = false,
+                    config.defaultValue.getValue(),
                     config.defaultValue,
                     "disabled",
                     evaluationDetails = evaluationDetails,
@@ -198,7 +199,8 @@ internal class Evaluator(
                     val pass = evaluatePassPercent(user, config, rule)
                     return ConfigEvaluation(
                         pass,
-                        if (pass) result.jsonValue else config.defaultValue,
+                        if (pass) result.jsonValue else config.defaultValue.getValue(),
+                        if (pass) result.returnableValue else config.defaultValue,
                         result.ruleID,
                         result.groupName,
                         secondaryExposures,
@@ -210,6 +212,7 @@ internal class Evaluator(
             }
             return ConfigEvaluation(
                 booleanValue = false,
+                config.defaultValue.getValue(),
                 config.defaultValue,
                 "default",
                 null,
@@ -244,6 +247,7 @@ internal class Evaluator(
 
         return ConfigEvaluation(
             booleanValue = pass,
+            rule.returnValue.getValue(),
             rule.returnValue,
             rule.id,
             rule.groupName,
@@ -314,6 +318,7 @@ internal class Evaluator(
                             !result.booleanValue
                         },
                         result.jsonValue,
+                        result.returnableValue,
                         "",
                         "",
                         secondaryExposures,

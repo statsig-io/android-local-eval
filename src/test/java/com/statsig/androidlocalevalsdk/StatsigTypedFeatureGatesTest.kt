@@ -37,7 +37,7 @@ class StatsigTypedFeatureGatesTest {
             events.addAll(it)
         })
 
-        val dcs = File("src/test/java/com/statsig/androidlocalevalsdk/eval_proj_dcs.json").readText()
+        val dcs = File("src/test/resources/eval_proj_dcs.json").readText()
 
         client = StatsigClient()
         client.statsigNetwork = network
