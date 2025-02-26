@@ -1,4 +1,4 @@
-package com.statsig.androidsdk
+package com.statsig.androidlocalevalsdk
 
 import android.content.Context
 import android.net.ConnectivityManager

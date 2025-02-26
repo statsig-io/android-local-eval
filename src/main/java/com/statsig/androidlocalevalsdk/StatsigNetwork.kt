@@ -2,7 +2,7 @@ package com.statsig.androidlocalevalsdk
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.statsig.androidsdk.StatsigNetworkConnectivityListener
+import com.statsig.androidlocalevalsdk.StatsigNetworkConnectivityListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
