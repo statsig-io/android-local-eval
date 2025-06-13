@@ -23,3 +23,10 @@ jobs:
         uses: gradle/gradle-build-action@v2
         with:
           arguments: test -i
+          
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/testDebugUnitTest/
