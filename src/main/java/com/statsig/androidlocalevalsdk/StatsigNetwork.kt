@@ -114,6 +114,8 @@ internal class StatsigNetwork(
             try {
                 while (isActive) {
                     connection = URL(api).openConnection() as HttpURLConnection
+
+                    connection.doOutput = true
                     connection.requestMethod = POST
                     if (timeout != null) {
                         connection.connectTimeout = timeout
@@ -135,7 +137,6 @@ internal class StatsigNetwork(
 
                     connection.outputStream.bufferedWriter(Charsets.UTF_8)
                         .use { it.write(bodyString) }
-
                     when (val code = connection.responseCode) {
                         in RETRY_CODES -> {
                             if (retries > 0 && retryAttempt++ < retries) {

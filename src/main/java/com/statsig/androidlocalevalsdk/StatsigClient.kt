@@ -53,6 +53,7 @@ class StatsigClient {
     private var initialized = AtomicBoolean(false)
     private var isBootstrapped = AtomicBoolean(false)
     private var typedProvider = TypedStatsigProvider()
+    private val retryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Initializes the SDK for the given user
@@ -131,7 +132,7 @@ class StatsigClient {
         return errorBoundary.capture({
                 options.initializeValues = initialSpecs
                 setup(application, sdkKey, options)
-                statsigScope.launch {
+                retryScope.launch {
                     statsigLogger.retryFailedLog(sharedPrefs)
                 }
                 diagnostics.markEnd(KeyType.OVERALL, true)
@@ -516,7 +517,7 @@ class StatsigClient {
             val initStartTime = StatsigUtils.getTimeInMillis()
             return@withContext errorBoundary.captureAsync({
                 diagnostics.markStart(KeyType.OVERALL)
-                statsigScope.launch {
+                retryScope.launch {
                     statsigLogger.retryFailedLog(sharedPrefs)
                 }
 

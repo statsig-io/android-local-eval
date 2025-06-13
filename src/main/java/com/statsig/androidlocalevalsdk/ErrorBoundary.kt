@@ -4,6 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.DataOutputStream
 import java.lang.Math.floor
@@ -101,7 +102,7 @@ internal class ErrorBoundary() {
 
     internal fun logException(exception: Throwable, message: String? = null, tag: String? = null, configName: String? = null) {
         try {
-            CoroutineScope(this.getNoopExceptionHandler() + Dispatchers.IO).launch {
+            CoroutineScope(SupervisorJob() + this.getNoopExceptionHandler() + Dispatchers.IO).launch {
                 Log.e("STATSIG", "An unexpected exception occured: " + exception)
                 if (message != null) {
                     Log.e("STATSIG", message)

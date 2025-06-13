@@ -81,7 +81,7 @@ internal object StatsigUtils {
                 pendingRequests.filter {
                     it.timestamp > currentTime - MAX_LOG_PERIOD
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 return@withContext arrayListOf()
             }
         }

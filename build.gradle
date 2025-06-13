@@ -9,7 +9,7 @@ buildscript {
 
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.0'
+        classpath 'com.android.tools.build:gradle:7.2.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "org.jlleitschuh.gradle:ktlint-gradle:11.5.1"
     }
@@ -95,8 +95,9 @@ task testLogging(type: Test) {
 
 task sourceJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
-    classifier "sources"
+    archiveClassifier.set("sources")
 }
+
 artifacts {
     archives sourceJar
 }
@@ -110,6 +111,9 @@ afterEvaluate {
                 groupId 'com.statsig'
                 artifactId 'android-local-eval'
                 version project.getProperty('libraryVersion')
+
+                artifact sourceJar
+
                 pom {
                     name = "Statsig Android Local Eval SDK"
                     description = "A SDK evaluating config locally for integrating Statsig with Android Apps"
