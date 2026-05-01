@@ -12,21 +12,21 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
 
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@91d3aa4956ec4a53e477c4907347b5e3481be8c9 # v2
         with:
           java-version: 11
           distribution: "adopt"
 
       - name: Test
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/gradle-build-action@fe583dc97e032f41ccc310ea5176f2d7306abbc4 # v2
         with:
           arguments: test -i
           
       - name: Upload test report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-report
           path: build/reports/tests/testDebugUnitTest/
